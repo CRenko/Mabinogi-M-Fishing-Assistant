@@ -134,6 +134,11 @@ class AppConfig:
     floating_status_opacity: int = 92
     # 背包满时自动进入整理流程；默认关闭，只使用关闭“大胆整理”后的四类简单整理。
     inventory_auto_cleanup_enabled: bool = False
+    # 加工次数表示添加到队列的次数，与每次产出的件数无关。
+    crafting_recipe: str = "wood"
+    crafting_mode: str = "count"
+    crafting_count: int = 4
+    crafting_queue_capacity: int = 0  # 自动识别可见队列；非 0 时额外核对用户填写的容量。
     # 语音目录按 voice/人物名/事件名N.wav 组织；编号文件为同事件随机音色。
     voice_alerts_enabled: bool = True
     voice_character: str = "新海天"
@@ -350,6 +355,21 @@ def _config_from_raw(raw: dict) -> AppConfig:
     raw["github_auto_check"] = bool(raw.get("github_auto_check", True))
 
     valid_names = {field.name for field in fields(AppConfig)}
+    from .crafting import RECIPE_BY_KEY
+    if raw.get("crafting_recipe") not in RECIPE_BY_KEY:
+        raw["crafting_recipe"] = "wood"
+    if raw.get("crafting_mode") not in {"count", "exhaust"}:
+        raw["crafting_mode"] = "count"
+    try:
+        raw["crafting_count"] = max(1, min(10000, int(raw.get("crafting_count", 4))))
+    except (TypeError, ValueError, OverflowError):
+        raw["crafting_count"] = 4
+    from .features.crafting.model import MAX_QUEUE_CAPACITY
+    try:
+        capacity = int(raw.get("crafting_queue_capacity", 0))
+        raw["crafting_queue_capacity"] = capacity if 0 <= capacity <= MAX_QUEUE_CAPACITY else 0
+    except (TypeError, ValueError, OverflowError):
+        raw["crafting_queue_capacity"] = 0
     values = {name: value for name, value in raw.items() if name in valid_names}
     values["button_center"] = _coerce_point(values.get("button_center"))
     values["target_button_offset"] = _coerce_point(

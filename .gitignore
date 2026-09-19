@@ -24,3 +24,22 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Review scratch, applied patch bundles and unrelated vendored projects
+.review-tmp/
+fix/
+tagcomplete/
+
+# Remote service / Android credentials and generated files
+node_modules/
+.wrangler/
+.dev.vars
+.env
+remote/android/.gradle/
+remote/android/local.properties
+*.jks
+*.keystore
+*.apk
+*.aab
+connection.bin
+activation-codes*.json

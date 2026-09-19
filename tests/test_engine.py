@@ -264,7 +264,7 @@ class FishingEngineTests(unittest.TestCase):
         engine = FishingEngine()
         engine._config = config  # type: ignore[attr-defined]
         with patch.object(engine, "_prepare_stamina_view"), patch(
-            "fishing_assistant.engine.pyautogui.press"
+            "pyautogui.press"
         ) as press:
             self.assertTrue(engine.set_monitoring(True))
             self.assertIsNotNone(engine._pending_recast_at)  # type: ignore[attr-defined]
@@ -290,7 +290,7 @@ class FishingEngineTests(unittest.TestCase):
         with patch.object(engine, "_prepare_stamina_view"), patch.object(
             engine, "_tap_key"
         ) as tap_key, patch(
-            "fishing_assistant.engine.pyautogui.press"
+            "pyautogui.press"
         ) as press:
             engine.set_monitoring(True)
             engine._process_frame(365, config, IconState.IDLE_RECOVERY)
@@ -319,7 +319,7 @@ class FishingEngineTests(unittest.TestCase):
         with patch.object(engine, "_prepare_stamina_view"), patch.object(
             engine, "_tap_key"
         ) as tap_key, patch(
-            "fishing_assistant.engine.pyautogui.press"
+            "pyautogui.press"
         ) as press:
             engine.set_monitoring(True)
             engine._process_frame(365, config, IconState.IDLE_RECOVERY)
@@ -340,7 +340,7 @@ class FishingEngineTests(unittest.TestCase):
         engine._pending_recast_at = 0.0  # type: ignore[attr-defined]
         engine._pending_recast_reason = "测试"  # type: ignore[attr-defined]
 
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(0, config, IconState.WAITING_BITE)
 
         press.assert_not_called()
@@ -513,7 +513,7 @@ class FishingEngineTests(unittest.TestCase):
             press_cooldown_ms=0,
         )
         engine = FishingEngine()
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED)
             engine._process_frame(1985, config, IconState.FISH_HOOKED)
             engine._process_frame(766, config, IconState.READY_TO_CAST)
@@ -605,7 +605,7 @@ class FishingEngineTests(unittest.TestCase):
             press_cooldown_ms=0,
         )
         engine = FishingEngine()
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED)
         press.assert_called_once_with("space")
 
@@ -621,7 +621,7 @@ class FishingEngineTests(unittest.TestCase):
         with patch(
             "fishing_assistant.engine.time.monotonic",
             side_effect=[100.0, 100.4, 101.0],
-        ), patch("fishing_assistant.engine.pyautogui.press") as press:
+        ), patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED)
             engine._process_frame(0, config, IconState.NORMAL)
             engine._process_frame(0, config, IconState.NORMAL)
@@ -646,7 +646,7 @@ class FishingEngineTests(unittest.TestCase):
         rebound = StaminaBarSample(
             72, (400, 300), midpoint_state=StaminaMidpointState.GREEN
         )
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=green)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
@@ -669,7 +669,7 @@ class FishingEngineTests(unittest.TestCase):
         green = StaminaBarSample(
             90, (505, 322), midpoint_state=StaminaMidpointState.GREEN
         )
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=green)
@@ -690,7 +690,7 @@ class FishingEngineTests(unittest.TestCase):
         dark = StaminaBarSample(
             48, (400, 300), midpoint_state=StaminaMidpointState.DARK
         )
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=green)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
@@ -711,7 +711,7 @@ class FishingEngineTests(unittest.TestCase):
         dark = StaminaBarSample(
             64, (400, 300), midpoint_state=StaminaMidpointState.DARK
         )
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=green)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=dark)
             engine._process_frame(1985, config, IconState.FISH_HOOKED, stamina_sample=green)
@@ -788,7 +788,7 @@ class FishingEngineTests(unittest.TestCase):
     def test_three_unconfirmed_casts_arm_rod_status_scan(self) -> None:
         config = AppConfig(capture_mode="screen", button_center=(1700, 900))
         engine = FishingEngine()
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             for attempt in range(FishingEngine.BLOCKING_MESSAGE_RETRY_THRESHOLD):
                 engine._pending_recast_at = 0.0  # type: ignore[attr-defined]
                 engine._pending_recast_reason = f"测试 {attempt}"  # type: ignore[attr-defined]
@@ -1026,7 +1026,7 @@ class FishingEngineTests(unittest.TestCase):
         engine._fish_resolution_pending = True  # type: ignore[attr-defined]
         engine._hook_started_at = 100.0  # type: ignore[attr-defined]
         with patch("fishing_assistant.engine.time.monotonic", return_value=112.7), patch(
-            "fishing_assistant.engine.pyautogui.press"
+            "pyautogui.press"
         ) as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED)
         press.assert_called_once_with("space")
@@ -1119,7 +1119,7 @@ class FishingEngineTests(unittest.TestCase):
         rebound = StaminaBarSample(
             82, (404, 302), midpoint_state=StaminaMidpointState.GREEN
         )
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED, green)
             engine._process_frame(0, config, IconState.NORMAL, dark)
             engine._process_frame(0, config, IconState.NORMAL, dark)
@@ -1162,9 +1162,9 @@ class FishingEngineTests(unittest.TestCase):
         )
         engine = FishingEngine()
         target = WindowInfo(100, "瑪奇 Mobile", 0, 0, 1920, 1080)
-        with patch("fishing_assistant.engine.pyautogui.scroll") as scroll, patch(
-            "fishing_assistant.engine.window_target.list_target_windows", return_value=[target]
-        ), patch("fishing_assistant.engine.window_target.activate_window") as activate, patch(
+        with patch("pyautogui.scroll") as scroll, patch(
+            "fishing_assistant.window_target.list_target_windows", return_value=[target]
+        ), patch("fishing_assistant.window_target.activate_window") as activate, patch(
             "fishing_assistant.engine.time.sleep"
         ):
             engine._prepare_stamina_view(config)
@@ -1182,8 +1182,8 @@ class FishingEngineTests(unittest.TestCase):
         )
         engine = FishingEngine()
         with patch.object(engine, "_resolve_target_window", return_value=target), patch(
-            "fishing_assistant.engine.window_target.activate_window"
-        ) as activate, patch("fishing_assistant.engine.pyautogui.scroll") as scroll, patch(
+            "fishing_assistant.window_target.activate_window"
+        ) as activate, patch("pyautogui.scroll") as scroll, patch(
             "fishing_assistant.engine.time.sleep"
         ):
             engine._prepare_stamina_view(config)
@@ -1196,7 +1196,7 @@ class FishingEngineTests(unittest.TestCase):
         engine._enabled.set()  # type: ignore[attr-defined]
 
         with patch(
-            "fishing_assistant.engine.pyautogui.position",
+            "pyautogui.position",
             return_value=(1710, 920),
         ), patch("fishing_assistant.engine.save_config"), patch.object(
             engine, "_schedule_recast"
@@ -1210,8 +1210,8 @@ class FishingEngineTests(unittest.TestCase):
     def test_f7_calibration_records_cursor_without_moving_it(self) -> None:
         engine = FishingEngine()
         engine._config = AppConfig(capture_mode="screen")  # type: ignore[attr-defined]
-        with patch("fishing_assistant.engine.pyautogui.position", return_value=(1700, 910)), patch(
-            "fishing_assistant.engine.pyautogui.moveTo"
+        with patch("pyautogui.position", return_value=(1700, 910)), patch(
+            "pyautogui.moveTo"
         ) as move, patch("fishing_assistant.engine.save_config"):
             position = engine.calibrate_from_cursor()
         self.assertEqual(position, (1700, 910))
@@ -1240,7 +1240,7 @@ class FishingEngineTests(unittest.TestCase):
         )
         engine = FishingEngine()
         with patch.object(engine, "_tap_key") as tap_key, patch(
-            "fishing_assistant.engine.pyautogui.press"
+            "pyautogui.press"
         ) as press:
             engine._process_frame(365, config, IconState.IDLE_RECOVERY)
             engine._process_frame(766, config, IconState.READY_TO_CAST)

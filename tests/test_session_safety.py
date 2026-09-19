@@ -175,6 +175,10 @@ class CleanupCancellationTests(unittest.TestCase):
         self.config = AppConfig(capture_mode="window", target_button_offset=(1700, 900))
         self.frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
         self.match = TemplateMatch(640, 170, 220, 65, 0.95, 1.0)
+        for name, value in (("_capture_stamina_frame", self.frame), ("_detect_cleanup_entry", None)):
+            mocked = patch.object(self.engine, name, return_value=value)
+            mocked.start()
+            self.addCleanup(mocked.stop)
         self.safe = SimpleCleanupState(
             self.match, BoldCleanupState.OFF, (True, True, True, True),
             True, (0.1, 0.1, 0.1, 0.1), 0.78,
@@ -270,9 +274,9 @@ class UiSessionSafetyTests(unittest.TestCase):
             return worker
 
         with (
-            patch("fishing_assistant.ui.threading.Thread", side_effect=thread),
-            patch("fishing_assistant.ui.check_github_release", side_effect=ValueError("bad data")),
-            patch("fishing_assistant.ui.record_error"),
+            patch("fishing_assistant.desktop.controllers.services.threading.Thread", side_effect=thread),
+            patch("fishing_assistant.desktop.controllers.services.check_github_release", side_effect=ValueError("bad data")),
+            patch("fishing_assistant.desktop.controllers.services.record_error"),
         ):
             MainWindow._check_for_updates(owner, manual=True)
         result = owner.update_ready.emit.call_args.args[0]

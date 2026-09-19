@@ -206,7 +206,7 @@ class CoordinateAndSupportBundleTest(unittest.TestCase):
                     (monitor["height"], monitor["width"], 4), dtype=np.uint8
                 )
 
-        with patch("fishing_assistant.engine.mss.MSS", return_value=FakeScreen()):
+        with patch("mss.MSS", return_value=FakeScreen()):
             frame, center, info = engine._diagnostic_capture_context(
                 config, capture_frame=True
             )

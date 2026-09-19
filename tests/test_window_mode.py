@@ -36,10 +36,10 @@ class WindowModeTests(unittest.TestCase):
         self.assertEqual(find_mabinogi_mobile_window([fallback, partial, exact]), exact)
         self.assertIsNone(find_mabinogi_mobile_window([fallback]))
 
-    @patch("fishing_assistant.engine.pyautogui.press")
-    @patch("fishing_assistant.engine.window_target.post_key_tap")
-    @patch("fishing_assistant.engine.window_target.post_mouse_move")
-    @patch("fishing_assistant.engine.window_target.resolve_window")
+    @patch("pyautogui.press")
+    @patch("fishing_assistant.window_target.post_key_tap")
+    @patch("fishing_assistant.window_target.post_mouse_move")
+    @patch("fishing_assistant.window_target.resolve_window")
     def test_window_mode_never_uses_foreground_pyautogui_press(
         self, resolve_window, post_mouse_move, post_key_tap, foreground_press
     ) -> None:
@@ -60,9 +60,9 @@ class WindowModeTests(unittest.TestCase):
         )
         foreground_press.assert_not_called()
 
-    @patch("fishing_assistant.engine.window_target.capture_window_region")
-    @patch("fishing_assistant.engine.window_target.post_mouse_move")
-    @patch("fishing_assistant.engine.window_target.resolve_window")
+    @patch("fishing_assistant.window_target.capture_window_region")
+    @patch("fishing_assistant.window_target.post_mouse_move")
+    @patch("fishing_assistant.window_target.resolve_window")
     def test_window_capture_uses_window_relative_button_offset(
         self, resolve_window, post_mouse_move, capture_window_region
     ) -> None:
@@ -85,9 +85,9 @@ class WindowModeTests(unittest.TestCase):
             self.target.handle, (1600, 860), 160, 180
         )
 
-    @patch("fishing_assistant.engine.window_target.capture_window_region")
-    @patch("fishing_assistant.engine.window_target.post_mouse_move")
-    @patch("fishing_assistant.engine.window_target.resolve_window")
+    @patch("fishing_assistant.window_target.capture_window_region")
+    @patch("fishing_assistant.window_target.post_mouse_move")
+    @patch("fishing_assistant.window_target.resolve_window")
     def test_window_capture_auto_scales_roi_for_2k_target(
         self, resolve_window, post_mouse_move, capture_window_region
     ) -> None:
@@ -111,7 +111,7 @@ class WindowModeTests(unittest.TestCase):
         )
 
     @patch("fishing_assistant.engine.time.sleep")
-    @patch("fishing_assistant.engine.window_target.resolve_window")
+    @patch("fishing_assistant.window_target.resolve_window")
     def test_ws_recovery_refreshes_virtual_hover_before_space(
         self, resolve_window, sleep
     ) -> None:
@@ -157,9 +157,9 @@ class WindowModeTests(unittest.TestCase):
             self.engine._refresh_hover_before_recast  # type: ignore[attr-defined]
         )
 
-    @patch("fishing_assistant.engine.window_target.capture_window_frame")
-    @patch("fishing_assistant.engine.window_target.post_mouse_move")
-    @patch("fishing_assistant.engine.window_target.resolve_window")
+    @patch("fishing_assistant.window_target.capture_window_frame")
+    @patch("fishing_assistant.window_target.post_mouse_move")
+    @patch("fishing_assistant.window_target.resolve_window")
     def test_window_stamina_capture_uses_full_target_frame(
         self, resolve_window, post_mouse_move, capture_window_frame
     ) -> None:
@@ -221,8 +221,8 @@ class WindowModeTests(unittest.TestCase):
 
         backend._interaction.click.assert_called_once_with(1919, 0)  # type: ignore[attr-defined]
 
-    @patch("fishing_assistant.engine.window_target.OkWindowBackend")
-    @patch("fishing_assistant.engine.window_target.resolve_window")
+    @patch("fishing_assistant.window_target.OkWindowBackend")
+    @patch("fishing_assistant.window_target.resolve_window")
     def test_ok_window_backend_handles_capture_and_key(
         self, resolve_window, backend_type
     ) -> None:

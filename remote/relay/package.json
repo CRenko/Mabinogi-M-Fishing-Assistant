@@ -1,0 +1,12 @@
+{
+  "name": "ok-fishing-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply fishing-remote --local"
+  },
+  "devDependencies": { "wrangler": "4.71.0" }
+}

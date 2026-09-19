@@ -16,6 +16,7 @@ from .constants import (
     CLEANUP_RESULT_HEADER_PATH,
     CLEANUP_SIMPLE_HEADER_PATH,
     INVENTORY_TIDY_ANCHOR_PATH,
+    resource_path,
 )
 
 
@@ -98,6 +99,7 @@ class InventoryCleanupVision:
 
     _feature_set: FeatureSet | None = None
     _templates: dict[Path, np.ndarray | None] = {}
+    last_scores: dict[str, float] = {}
 
     @classmethod
     def _get_feature_set(cls) -> FeatureSet:
@@ -114,7 +116,13 @@ class InventoryCleanupVision:
     @classmethod
     def _load_template(cls, path: Path) -> np.ndarray | None:
         if path not in cls._templates:
-            cls._templates[path] = cv2.imread(str(path), cv2.IMREAD_COLOR)
+            # Windows 中文目录下 imread 在部分 OpenCV 版本会失败。
+            try:
+                cls._templates[path] = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+            except OSError as error:
+                raise RuntimeError(f"无法读取背包识别模板：{path.name}") from error
+            if cls._templates[path] is None:
+                raise RuntimeError(f"背包识别模板损坏：{path.name}")
         return cls._templates[path]
 
     @classmethod
@@ -127,6 +135,7 @@ class InventoryCleanupVision:
         threshold: float,
         *,
         gray: bool = True,
+        scales: tuple[float, ...] | None = None,
     ) -> TemplateMatch | None:
         template = cls._load_template(path)
         if (
@@ -155,7 +164,7 @@ class InventoryCleanupVision:
 
         best: TemplateMatch | None = None
         feature_set = cls._get_feature_set()
-        for scale in cls.TEMPLATE_SCALES:
+        for scale in scales or cls.TEMPLATE_SCALES:
             candidate = cv2.resize(
                 template,
                 (
@@ -192,19 +201,36 @@ class InventoryCleanupVision:
             if best is None or match.confidence > best.confidence:
                 best = match
 
+        cls.last_scores[category] = best.confidence if best else 0.0
         if best is None or best.confidence < threshold:
             return None
         return best
 
     @classmethod
+    def find_inventory_tab(cls, bgr: np.ndarray) -> TemplateMatch | None:
+        """确认背包已经打开；暂时看不清整理入口时也不能再按 I 关掉背包。"""
+        scales = tuple(float(s) for s in np.linspace(0.30, 0.95, 27))
+        return cls._find(bgr, resource_path("fishing_assistant", "assets", "inventory_items_tab.png"),
+                        "inventory_items_tab", (0.53, 0.78, 0.96, 1.0), .82, scales=scales)
+
+    @classmethod
     def find_inventory_tidy(cls, bgr: np.ndarray) -> TemplateMatch | None:
+        # 双锚点避免把简单整理/其他界面的“整理”当入口。
+        if cls.find_inventory_tab(bgr) is None:
+            return None
+        scales = tuple(float(s) for s in np.linspace(0.30, 0.95, 27))
+        text = cls._find(bgr, resource_path("fishing_assistant", "assets", "inventory_tidy_text.png"),
+                         "inventory_tidy_text", (0.68, 0.58, 0.995, 0.95), .84, scales=scales)
+        if text is not None:
+            return text
+        # 保留完整按钮模板作为第二种 OK 模板，不退回像素定位。
         return cls._find(
             bgr,
             INVENTORY_TIDY_ANCHOR_PATH,
             "inventory_tidy_anchor",
             (0.70, 0.62, 0.99, 0.94),
             cls.INVENTORY_THRESHOLD,
-            gray=False,
+            gray=True,
         )
 
     @classmethod
@@ -213,7 +239,7 @@ class InventoryCleanupVision:
             bgr,
             CLEANUP_SIMPLE_HEADER_PATH,
             "cleanup_simple_header",
-            (0.12, 0.02, 0.72, 0.62),
+            (0.0, 0.02, 0.93, 0.62),
             cls.SIMPLE_HEADER_THRESHOLD,
         )
 
@@ -306,9 +332,10 @@ class InventoryCleanupVision:
         )
         orange_ratio = float(np.count_nonzero(orange) / orange.size)
         gray_ratio = float(np.count_nonzero(gray) / gray.size)
-        if orange_ratio >= 0.24 and gray_ratio <= 0.12:
+        on_score, off_score = cls._bold_switch_scores(toggle_roi, anchor.source_scale)
+        if orange_ratio >= 0.24 and gray_ratio <= 0.12 and on_score >= .86 and on_score-off_score >= .04:
             bold_state = BoldCleanupState.ON
-        elif gray_ratio >= 0.24 and orange_ratio <= 0.08:
+        elif gray_ratio >= 0.24 and orange_ratio <= 0.08 and off_score >= .86 and off_score-on_score >= .04:
             bold_state = BoldCleanupState.OFF
         else:
             bold_state = BoldCleanupState.UNKNOWN
@@ -347,3 +374,22 @@ class InventoryCleanupVision:
             category_green_ratios=tuple(category_green_ratios),
             execute_green_ratio=execute_green_ratio,
         )
+
+    @classmethod
+    def _bold_switch_scores(cls, roi: np.ndarray, scale: float) -> tuple[float, float]:
+        """OK 核验白色滑块左右位置；颜色仅作额外安全门，不能单凭灰色判关闭。"""
+        scores = []
+        for state in ("on", "off"):
+            template = cls._load_template(resource_path("fishing_assistant", "assets", f"cleanup_bold_{state}.png"))
+            best = 0.0
+            for factor in (.94, .98, 1.0, 1.02, 1.06):
+                size = (max(2, round(template.shape[1]*scale*factor)), max(2, round(template.shape[0]*scale*factor)))
+                if size[0] > roi.shape[1] or size[1] > roi.shape[0]:
+                    continue
+                candidate = cv2.resize(template, size, interpolation=cv2.INTER_AREA)
+                boxes = cls._get_feature_set().find_feature(roi, "cleanup_bold_"+state,
+                    template=candidate, use_gray_scale=False, threshold=.01, limit=1)
+                best = max(best, max((float(b.confidence) for b in boxes), default=0.0))
+            scores.append(best)
+            cls.last_scores["bold_"+state] = best
+        return tuple(scores)

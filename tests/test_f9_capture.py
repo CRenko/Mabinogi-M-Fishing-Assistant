@@ -33,10 +33,10 @@ class F9CaptureTests(unittest.TestCase):
     def test_same_frame_saved_in_timestamped_zip_and_unicode_roi_path(self):
         with (
             TemporaryDirectory() as tmp,
-            patch("fishing_assistant.engine.VISION_DIAGNOSTICS_DIR", Path(tmp) / "中文诊断"),
+            patch("fishing_assistant.automation.diagnostics.VISION_DIAGNOSTICS_DIR", Path(tmp) / "中文诊断"),
             patch.object(self.engine, "_diagnostic_capture_context", return_value=self.context) as capture,
-            patch("fishing_assistant.engine.vision_diagnostics.run_pipeline_check", return_value=None),
-            patch("fishing_assistant.engine.vision_diagnostics.collect_environment", return_value={}),
+            patch("fishing_assistant.vision.diagnostics.run_pipeline_check", return_value=None),
+            patch("fishing_assistant.vision.diagnostics.collect_environment", return_value={}),
             patch.object(self.engine, "_press_key") as press,
             patch.object(self.engine, "_maintain_background_hover") as hover,
         ):
@@ -66,12 +66,12 @@ class F9CaptureTests(unittest.TestCase):
         target = WindowInfo(101, "游戏", 0, 0, 1280, 720)
         with (
             TemporaryDirectory() as tmp,
-            patch("fishing_assistant.engine.VISION_DIAGNOSTICS_DIR", Path(tmp)),
+            patch("fishing_assistant.automation.diagnostics.VISION_DIAGNOSTICS_DIR", Path(tmp)),
             patch.object(self.engine, "_diagnostic_capture_context", return_value=(
                 self.frame, (1250, 700), {"expected_size": [1280, 720]},
             )),
-            patch("fishing_assistant.engine.vision_diagnostics.run_pipeline_check", return_value=None),
-            patch("fishing_assistant.engine.vision_diagnostics.collect_environment", return_value={}),
+            patch("fishing_assistant.vision.diagnostics.run_pipeline_check", return_value=None),
+            patch("fishing_assistant.vision.diagnostics.collect_environment", return_value={}),
         ):
             path = self.engine.save_debug_capture(self.config)
             self.assertIsNotNone(path)
@@ -83,10 +83,10 @@ class F9CaptureTests(unittest.TestCase):
         config = self.config.copy(capture_mode="screen", button_center=(-340, 240))
         with (
             TemporaryDirectory() as tmp,
-            patch("fishing_assistant.engine.VISION_DIAGNOSTICS_DIR", Path(tmp)),
+            patch("fishing_assistant.automation.diagnostics.VISION_DIAGNOSTICS_DIR", Path(tmp)),
             patch.object(self.engine, "_diagnostic_capture_context", return_value=self.context),
-            patch("fishing_assistant.engine.vision_diagnostics.run_pipeline_check", return_value=None) as check,
-            patch("fishing_assistant.engine.vision_diagnostics.collect_environment", return_value={}),
+            patch("fishing_assistant.vision.diagnostics.run_pipeline_check", return_value=None) as check,
+            patch("fishing_assistant.vision.diagnostics.collect_environment", return_value={}),
         ):
             self.engine.save_debug_capture(config)
             self.assertEqual(check.call_args.args[1], (300, 240))
@@ -102,7 +102,7 @@ class F9CaptureTests(unittest.TestCase):
     def test_capture_failure_does_not_report_success_or_critical_stop(self):
         with (
             patch.object(self.engine, "_diagnostic_capture_context", side_effect=RuntimeError("窗口最小化")),
-            patch("fishing_assistant.engine.record_error"),
+            patch("fishing_assistant.automation.diagnostics.record_error"),
         ):
             self.assertIsNone(self.engine.save_debug_capture())
         self.assertEqual(self.events[-1].kind, EventKind.DIAGNOSTIC)
@@ -112,12 +112,12 @@ class F9CaptureTests(unittest.TestCase):
     def test_image_write_failure_reports_partial_success(self):
         with (
             TemporaryDirectory() as tmp,
-            patch("fishing_assistant.engine.VISION_DIAGNOSTICS_DIR", Path(tmp)),
+            patch("fishing_assistant.automation.diagnostics.VISION_DIAGNOSTICS_DIR", Path(tmp)),
             patch.object(self.engine, "_diagnostic_capture_context", return_value=self.context),
-            patch("fishing_assistant.engine.vision_diagnostics.run_pipeline_check", return_value=None),
-            patch("fishing_assistant.engine.vision_diagnostics.collect_environment", return_value={}),
+            patch("fishing_assistant.vision.diagnostics.run_pipeline_check", return_value=None),
+            patch("fishing_assistant.vision.diagnostics.collect_environment", return_value={}),
             patch("pathlib.Path.write_bytes", side_effect=OSError("disk failure")),
-            patch("fishing_assistant.engine.record_error"),
+            patch("fishing_assistant.automation.diagnostics.record_error"),
         ):
             self.assertIsNone(self.engine.save_debug_capture())
             self.assertEqual(self.events[-1].snapshot_state, "partial")
@@ -151,7 +151,7 @@ class F9CaptureTests(unittest.TestCase):
     def test_worker_failure_releases_lock_and_emits_finished_state(self):
         with (
             patch.object(self.engine, "save_debug_capture", side_effect=RuntimeError("worker failure")),
-            patch("fishing_assistant.engine.record_error"),
+            patch("fishing_assistant.automation.diagnostics.record_error"),
         ):
             self.assertTrue(self.engine.request_debug_capture())
             self.engine._debug_capture_thread.join(2)
@@ -174,7 +174,7 @@ class F9UiTests(unittest.TestCase):
     def test_view_missing_screenshot_has_clear_hint(self):
         owner = MagicMock()
         owner._last_snapshot_path = None
-        with patch("fishing_assistant.ui.QDesktopServices.openUrl") as opened:
+        with patch("fishing_assistant.desktop.controllers.services.QDesktopServices.openUrl") as opened:
             MainWindow._view_snapshot(owner)
         opened.assert_not_called()
         owner.view_snapshot_button.setEnabled.assert_called_with(False)

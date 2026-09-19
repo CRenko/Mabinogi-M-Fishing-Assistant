@@ -76,6 +76,13 @@ def main() -> int:
         or "pyside6\\qt6core.dll" not in archive_names
     ):
         errors.append("Required PySide6 QtCore binaries are missing.")
+    for resource in (
+        "checkmark.svg", "inventory_items_tab.png", "inventory_tidy_text.png",
+        "cleanup_bold_on.png", "cleanup_bold_off.png",
+        "crafting/detail_iron.png", "crafting/ingredient_ore.png", "crafting/ingredient_iron_ore.png",
+    ):
+        if "fishing_assistant\\assets\\" + resource.replace("/", "\\") not in archive_names:
+            errors.append(f"Required UI/OK recognition resource is missing: {resource}")
 
     if errors:
         print("Bundle verification failed.")
