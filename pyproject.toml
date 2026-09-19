@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mabinogi-m-fishing-helper"
-version = "0.6.4"
+version = "0.8.0"
 description = "Local screen-based fishing helper for Mabinogi M"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -16,6 +16,7 @@ dependencies = [
   "pynput==1.8.2",
   "PySide6==6.10.2",
   "ok-script[default]==2.0.6",
+  "qrcode==8.2",
 ]
 
 [project.scripts]
@@ -28,4 +29,4 @@ py-modules = ["mabinogi_fishing_helper"]
 include = ["fishing_assistant*"]
 
 [tool.setuptools.package-data]
-fishing_assistant = ["assets/*"]
+fishing_assistant = ["assets/*", "assets/crafting/*.png"]

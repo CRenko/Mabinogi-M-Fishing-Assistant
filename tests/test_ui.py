@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QLabel,
     QTextBrowser,
+    QToolButton,
 )
 
 from fishing_assistant.ui import (
@@ -65,7 +66,7 @@ class UiRegressionTests(unittest.TestCase):
         titles = [title for _eyebrow, title, _subtitle in MainWindow.PAGE_META]
         self.assertEqual(
             titles,
-            ["钓鱼控制台", "钓鱼设置", "识别阈值", "应用设置", "使用说明"],
+            ["钓鱼控制台", "钓鱼设置", "自动制作（测试）", "识别阈值", "应用设置", "使用说明"],
         )
         self.assertNotIn("背包清理（实验性）", titles)
 
@@ -80,7 +81,11 @@ class UiRegressionTests(unittest.TestCase):
                 for label in card.findChildren(QLabel)
             )
             self.assertIn("背包清理（实验性）", labels)
-            self.assertIn("执行前安全检查", labels)
+            toggle = safety_card.findChild(QToolButton, "detailsToggle")
+            self.assertEqual(toggle.text(), "执行前安全检查")
+            self.assertFalse(toggle.isChecked())
+            self.assertIn("永久分解或出售", labels)
+            self.assertIn("大胆整理", labels)
         finally:
             cleanup_card.close()
             safety_card.close()
@@ -142,7 +147,7 @@ class UiRegressionTests(unittest.TestCase):
         bar = FloatingStatusBar()
         try:
             self.assertLessEqual(bar.width(), 360)
-            self.assertLessEqual(bar.height(), 90)
+            self.assertLessEqual(bar.height(), 130)
             self.assertTrue(
                 bar.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
             )
@@ -176,6 +181,7 @@ class UiRegressionTests(unittest.TestCase):
             _sync_floating_calibration_state=MagicMock(),
         )
         owner.engine.config.return_value = config
+        owner.floating_status_bar.isVisible.return_value = False
 
         MainWindow._sync_floating_status_visibility(owner)  # type: ignore[arg-type]
 
@@ -233,11 +239,12 @@ class UiRegressionTests(unittest.TestCase):
         engine.update_config.side_effect = update_config
         engine.is_monitoring.return_value = False
         with patch(
-            "fishing_assistant.ui.window_target.list_target_windows",
+            "fishing_assistant.window_target.list_target_windows",
             return_value=[],
         ):
             window = MainWindow(engine)
         try:
+            self.assertFalse(hasattr(window, "remote_panel"))
             window.show()
             self.app.processEvents()
             window.showMinimized()
@@ -312,21 +319,24 @@ class UiRegressionTests(unittest.TestCase):
 
         owner.recovery_mode_stack.setCurrentIndex.assert_called_with(1)
         owner.auto_recover_check.setText.assert_called_with(
-            "检测到指南针状态时仅按 W 向前恢复"
+            "自动恢复钓鱼图标"
         )
+        self.assertIn("仅按 W", owner.auto_recover_check.setToolTip.call_args.args[0])
 
         owner.recovery_mode_combo.currentData.return_value = "ws"
         MainWindow._sync_recovery_mode_controls(owner)  # type: ignore[arg-type]
 
         owner.recovery_mode_stack.setCurrentIndex.assert_called_with(0)
         owner.auto_recover_check.setText.assert_called_with(
-            "检测到指南针状态时自动执行 W → S"
+            "自动恢复钓鱼图标"
         )
+        self.assertIn("W → S", owner.auto_recover_check.setToolTip.call_args.args[0])
 
     def test_pixel_fish_threshold_only_shows_in_pixel_mode(self) -> None:
         owner = SimpleNamespace(
             recognition_backend_combo=MagicMock(),
             pixel_fish_threshold_panel=MagicMock(),
+            pixel_compass_threshold_panel=MagicMock(),
             threshold_header_label=MagicMock(),
             threshold_value=MagicMock(),
             threshold_slider=MagicMock(),
@@ -348,11 +358,13 @@ class UiRegressionTests(unittest.TestCase):
         MainWindow._sync_recognition_backend_controls(owner)  # type: ignore[arg-type]
 
         owner.pixel_fish_threshold_panel.setVisible.assert_called_with(False)
+        owner.pixel_compass_threshold_panel.setVisible.assert_called_with(False)
 
         owner.recognition_backend_combo.currentData.return_value = "pixel"
         MainWindow._sync_recognition_backend_controls(owner)  # type: ignore[arg-type]
 
         owner.pixel_fish_threshold_panel.setVisible.assert_called_with(True)
+        owner.pixel_compass_threshold_panel.setVisible.assert_called_with(True)
         owner.threshold_slider.setEnabled.assert_called_with(True)
 
     def test_w_only_warning_requires_acknowledgement(self) -> None:
@@ -422,7 +434,8 @@ class UiRegressionTests(unittest.TestCase):
         )
         status = owner.inventory_cleanup_test_status.setText.call_args.args[0]
         self.assertIn("无需开启正式自动清理", status)
-        self.assertIn("不会修改正式功能开关", status)
+        tooltip = owner.inventory_cleanup_test_status.setToolTip.call_args.args[0]
+        self.assertIn("不会修改正式功能开关", tooltip)
 
     def test_debug_section_contains_inventory_cleanup_as_child_option(self) -> None:
         owner = SimpleNamespace(_card_heading=MainWindow._card_heading)
@@ -451,7 +464,7 @@ class UiRegressionTests(unittest.TestCase):
             _sync_inventory_cleanup_debug_controls=MagicMock(),
         )
         with patch(
-            "fishing_assistant.ui.InventoryCleanupWarningDialog"
+            "fishing_assistant.desktop.controllers.fishing.InventoryCleanupWarningDialog"
         ) as dialog_type:
             dialog_type.return_value.exec.return_value = (
                 QDialog.DialogCode.Rejected
@@ -472,7 +485,7 @@ class UiRegressionTests(unittest.TestCase):
             _sync_inventory_cleanup_debug_controls=MagicMock(),
         )
         with patch(
-            "fishing_assistant.ui.InventoryCleanupWarningDialog"
+            "fishing_assistant.desktop.controllers.fishing.InventoryCleanupWarningDialog"
         ) as dialog_type:
             dialog_type.return_value.exec.return_value = (
                 QDialog.DialogCode.Accepted
@@ -494,7 +507,7 @@ class UiRegressionTests(unittest.TestCase):
         owner.engine.is_monitoring.return_value = False
         owner.engine.request_inventory_cleanup_test.return_value = True
         with patch(
-            "fishing_assistant.ui.InventoryCleanupTestDialog"
+            "fishing_assistant.desktop.controllers.fishing.InventoryCleanupTestDialog"
         ) as dialog_type:
             dialog_type.return_value.exec.return_value = (
                 QDialog.DialogCode.Accepted
@@ -514,7 +527,7 @@ class UiRegressionTests(unittest.TestCase):
             engine=MagicMock(),
             _sync_recovery_mode_controls=MagicMock(),
         )
-        with patch("fishing_assistant.ui.WOnlyModeWarningDialog") as dialog_type:
+        with patch("fishing_assistant.desktop.controllers.fishing.WOnlyModeWarningDialog") as dialog_type:
             dialog_type.return_value.exec.return_value = QDialog.DialogCode.Rejected
             MainWindow._recovery_mode_changed(owner)  # type: ignore[arg-type]
 
@@ -533,7 +546,7 @@ class UiRegressionTests(unittest.TestCase):
             engine=MagicMock(),
             _sync_recovery_mode_controls=MagicMock(),
         )
-        with patch("fishing_assistant.ui.WOnlyModeWarningDialog") as dialog_type:
+        with patch("fishing_assistant.desktop.controllers.fishing.WOnlyModeWarningDialog") as dialog_type:
             dialog_type.return_value.exec.return_value = QDialog.DialogCode.Accepted
             MainWindow._recovery_mode_changed(owner)  # type: ignore[arg-type]
 

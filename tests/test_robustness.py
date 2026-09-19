@@ -221,7 +221,7 @@ class RecoveryCancellationTests(unittest.TestCase):
         engine._pending_recast_at = 1.0
         engine._pending_recast_reason = "测试"
 
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._perform_pending_recast(2.0, IconState.READY_TO_CAST, config)
 
         press.assert_not_called()
@@ -235,7 +235,7 @@ class RecoveryCancellationTests(unittest.TestCase):
         engine._pending_recast_at = 1.0
         engine._pending_recast_reason = "测试"
 
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._perform_pending_recast(
                 2.0, IconState.READY_TO_CAST, stale_frame_config
             )
@@ -421,7 +421,7 @@ class StrategySwitchTests(unittest.TestCase):
             press_cooldown_ms=0,
         )
         engine = FishingEngine()
-        with patch("fishing_assistant.engine.pyautogui.press") as press:
+        with patch("pyautogui.press") as press:
             engine._process_frame(1985, config, IconState.FISH_HOOKED)
             press.assert_not_called()
             switched = config.copy(catch_strategy="instant")
@@ -547,7 +547,7 @@ class OkBackendLifecycleTests(unittest.TestCase):
         engine = FishingEngine()
         target = WindowInfo(101, "瑪奇 Mobile", 0, 0, 1920, 1080)
         with patch(
-            "fishing_assistant.engine.window_target.OkWindowBackend", SlowBackend
+            "fishing_assistant.window_target.OkWindowBackend", SlowBackend
         ):
             threads = [
                 threading.Thread(
@@ -595,7 +595,7 @@ class OkBackendLifecycleTests(unittest.TestCase):
             target_button_offset=(1600, 860),
         )
         with patch(
-            "fishing_assistant.engine.window_target.OkWindowBackend", SlowBackend
+            "fishing_assistant.window_target.OkWindowBackend", SlowBackend
         ), patch.object(
             engine, "_resolve_target_window", return_value=target
         ), patch.object(engine, "_maintain_background_hover"):
@@ -761,7 +761,7 @@ class EscapeWatchCharacterizationTests(unittest.TestCase):
         )
         events = []
         engine = FishingEngine(events.append)
-        with patch("fishing_assistant.engine.pyautogui.press") as press, patch(
+        with patch("pyautogui.press") as press, patch(
             "fishing_assistant.engine.time.monotonic"
         ) as clock:
             clock.return_value = 100.0

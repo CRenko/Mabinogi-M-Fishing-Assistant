@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .constants import APP_ICON_PATH, APP_NAME
@@ -14,6 +14,7 @@ from .engine import FishingEngine
 from .splash import create_splash
 from .startup_guard import prepare_windows_startup
 from .ui import MainWindow
+from .desktop.design import ui_font
 
 
 def _run_application() -> int:
@@ -21,7 +22,7 @@ def _run_application() -> int:
     app.setApplicationName("Mabinogi M Fishing Assistant")
     app.setApplicationDisplayName(APP_NAME)
     app.setStyle("Fusion")
-    app.setFont(QFont("Segoe UI", 10))
+    app.setFont(ui_font())
     if APP_ICON_PATH.exists():
         app.setWindowIcon(QIcon(str(APP_ICON_PATH)))
 
@@ -53,6 +54,9 @@ def _run_application() -> int:
 
 
 def main() -> None:
+    if len(sys.argv) == 3 and sys.argv[1] == "--verify-bundle":
+        from .desktop.bundle_check import verify_bundle
+        raise SystemExit(verify_bundle(sys.argv[2]))
     startup_guard = prepare_windows_startup()
     if startup_guard is None:
         return

@@ -11,3 +11,11 @@
 
 本项目自身继续采用 [MIT License](LICENSE)。使用、分发或修改时，也请同时遵守
 ok-script 及其传递依赖的各自许可证。
+
+## 手机远程查看组件
+
+- 电脑二维码生成：python-qrcode 8.2，BSD-3-Clause，https://github.com/lincolnloop/python-qrcode
+- Android 扫码：ZXing Android Embedded 4.3.0，Apache-2.0，https://github.com/journeyapps/zxing-android-embedded
+- ZXing 和 AndroidX：Apache-2.0，遵守其各自发行包中的许可证与通知。
+
+手机端和中转代码沿用本项目的 MIT 许可证；中转服务不包含或运行 OK 游戏自动化引擎。

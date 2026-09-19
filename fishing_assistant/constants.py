@@ -7,10 +7,13 @@ from pathlib import Path
 
 
 APP_NAME = "洛奇 M 钓鱼助手"
-APP_VERSION = "0.6.4"
+APP_VERSION = "0.8.0"
 APP_AUTHOR = "番茄啾"
 APP_DISPLAY_VERSION = APP_VERSION
 GITHUB_REPOSITORY = "fanqiejiu/Mabinogi-M-Fishing-Assistant"
+
+# 预备功能：公网与手机验收完成前，不开放入口，也不启动状态上报。
+REMOTE_PREVIEW_ENABLED = False
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = PACKAGE_DIR.parent

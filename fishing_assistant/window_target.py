@@ -6,11 +6,14 @@ import ctypes
 import sys
 import threading
 import time
-from collections.abc import Iterable
+import unicodedata
+from collections.abc import Callable, Iterable
 from ctypes import wintypes
 from dataclasses import dataclass
 
 import numpy as np
+
+from .window_geometry import ClientFrame, ClientGeometry, physical_window_coordinates, read_client_geometry
 
 
 if sys.platform == "win32":
@@ -119,6 +122,13 @@ class WindowInfo:
     top: int
     width: int
     height: int
+    minimized: bool = False
+
+    @property
+    def display_label(self) -> str:
+        if self.minimized:
+            return f"{self.title} · 已最小化，请恢复窗口"
+        return f"{self.title} · {self.width} × {self.height}"
 
     @property
     def right(self) -> int:
@@ -148,9 +158,21 @@ class _OkWindowAdapter:
         self.window_width, self.window_height = info.width, info.height
         self.client_width, self.client_height = info.width, info.height
         self.exists = True
+        self._client_geometry = None
+
+    def update_client(self, info: WindowInfo, geometry: ClientGeometry) -> None:
+        self.update(info)
+        self.x, self.y = geometry.left, geometry.top
+        # OK WGC 用 width/height 裁掉标题栏与边框；PostMessage 使用客户区坐标。
+        self.width = self.client_width = geometry.width
+        self.height = self.client_height = geometry.height
+        self.window_width, self.window_height = geometry.window_width, geometry.window_height
+        self._client_geometry = geometry
 
     @property
-    def capture_target_signature(self) -> tuple[int, int, int, int, int]:
+    def capture_target_signature(self) -> tuple:
+        if self._client_geometry is not None:
+            return ("client", *self._client_geometry.layout_signature)
         return self.hwnd, self.width, self.height, self.x, self.y
 
     def get_abs_cords(self, x: int, y: int) -> tuple[int, int]:
@@ -186,7 +208,7 @@ class OkWindowBackend:
 
     def update(self, info: WindowInfo) -> None:
         if info.handle != self._handle:
-            raise RuntimeError("OK 后台会话的目标窗口已变化，请重新建立连接。")
+            raise RuntimeError("窗口捕获会话的目标已变化，请重新建立连接。")
         with self._lock:
             self._adapter.update(info)
 
@@ -198,11 +220,12 @@ class OkWindowBackend:
             from ok.device.interaction_methods import PostMessageInteraction
         except ImportError as error:
             raise RuntimeError(
-                "OK 后台组件未安装；请运行 setup.bat 重新安装环境。"
+                "无法加载窗口捕获与输入组件（ok-script）；请运行 setup.bat 修复依赖。"
             ) from error
         capture = WindowsGraphicsCaptureMethod(self._adapter)
         self._capture = capture
-        self._interaction = PostMessageInteraction(capture, self._adapter)
+        from fishing_assistant.window_interaction import CheckedPostMessageInteraction
+        self._interaction = CheckedPostMessageInteraction(capture, self._adapter)
 
     def _get_frame_with_warmup(self) -> np.ndarray:
         """WGC 建立会话后的首帧可能稍晚到达，短暂重试而非立刻暂停监测。"""
@@ -211,7 +234,7 @@ class OkWindowBackend:
             if isinstance(frame, np.ndarray) and frame.ndim == 3 and frame.size:
                 return frame
             time.sleep(0.06)
-        raise RuntimeError("OK WGC 预热后仍未收到窗口画面，请确认游戏未最小化。")
+        raise RuntimeError("WGC 初始化后仍未收到窗口画面，请确认游戏未最小化。")
 
     def capture_region(
         self,
@@ -233,6 +256,59 @@ class OkWindowBackend:
             self._ensure_started()
             frame = self._get_frame_with_warmup()
         return frame.copy()
+
+    def capture_client_frame(self, info: WindowInfo) -> ClientFrame:
+        """显式客户区通路：制作识别与点击共享同一帧几何信息，兼容旧校准通路。"""
+        with self._lock, physical_window_coordinates():
+            self.update(info)
+            geometry = read_client_geometry(info.handle, info.title)
+            self._adapter.update_client(info, geometry)
+            self._ensure_started()
+            snapshot = ClientFrame(self._get_frame_with_warmup().copy(), geometry)
+            snapshot.ensure_current(read_client_geometry(info.handle, info.title))
+            snapshot.validate()
+            return snapshot
+
+    def _client_input(
+        self, info: WindowInfo, snapshot: ClientFrame, point: tuple[int, int] | None,
+        action: str, before_input: Callable[[], None], check_active: Callable[[], None] | None = None,
+    ) -> None:
+        with self._lock, physical_window_coordinates():
+            self.update(info)
+            geometry = read_client_geometry(info.handle, info.title)
+            snapshot.ensure_current(geometry)
+            x, y = snapshot.client_point(point)
+            self._adapter.update_client(info, geometry)
+            self._ensure_started()
+            ensure_active = check_active or before_input
+
+            def commit_input():
+                # 悬停等待期间也可能发生暂停、缩放或跨屏；按下前再确认一次。
+                ensure_active()
+                snapshot.ensure_current(read_client_geometry(info.handle, info.title))
+                before_input()
+
+            with self._interaction.input_guard(ensure_active, commit_input):
+                if action == "click":
+                    # OK 默认只有 10ms：低帧率/后台时悬停与点击可能落在同一帧。
+                    self._interaction.click(x, y, down_time=0.08)
+                elif action == "hover":
+                    self._interaction.move(x, y)
+                else:
+                    self._interaction.send_key(action, 0.08)
+
+    def click_client(self, info, snapshot, point, *, before_input: Callable[[], None], check_active=None) -> None:
+        if point is None:
+            raise RuntimeError("未找到可点击的材料或领取按钮，未发送操作。")
+        self._client_input(info, snapshot, point, "click", before_input, check_active)
+
+    def hover_client(self, info, snapshot, point, *, before_input: Callable[[], None]) -> None:
+        self._client_input(info, snapshot, point, "hover", before_input)
+
+    def tap_client_key(self, info, snapshot, key: str, *, before_input: Callable[[], None], check_active=None) -> None:
+        if key not in {"space", "esc"}:
+            raise ValueError("客户区确认仅支持 Space / Esc。")
+        self._client_input(info, snapshot, None, key, before_input, check_active)
 
     def tap_key(self, key: str, hold_ms: int = 0) -> None:
         with self._lock:
@@ -277,7 +353,7 @@ def _crop_backend_frame(
 ) -> np.ndarray:
     """按校准时的窗口坐标裁剪 WGC 帧，并兼容 DWM 边框造成的尺寸差。"""
     if frame.ndim != 3 or frame.shape[0] <= 0 or frame.shape[1] <= 0:
-        raise RuntimeError("OK WGC 返回了无效画面。")
+        raise RuntimeError("WGC 返回了无效画面。")
     frame_height, frame_width = frame.shape[:2]
     scale_x = frame_width / max(1, info.width)
     scale_y = frame_height / max(1, info.height)
@@ -286,7 +362,7 @@ def _crop_backend_frame(
     crop_width = max(1, round(width * scale_x))
     crop_height = max(1, round(height * scale_y))
     if crop_width > frame_width or crop_height > frame_height:
-        raise RuntimeError("OK WGC 窗口画面小于识别区域，请恢复游戏窗口尺寸。")
+        raise RuntimeError("WGC 捕获画面小于识别区域，请恢复游戏窗口尺寸。")
     # 钓鱼按钮位于右下角，校准点本身有效时，识别框仍可能越过 WGC 客户区
     # 十几像素。保持识别框大小并向窗口内平移，按键坐标继续使用原校准点。
     left = min(max(0, center_x - crop_width // 2), frame_width - crop_width)
@@ -298,13 +374,27 @@ def _crop_backend_frame(
 def find_mabinogi_mobile_window(
     windows: Iterable[WindowInfo],
 ) -> WindowInfo | None:
-    """优先寻找标题为“瑪奇 Mobile”的窗口，也兼容附带后缀的标题。"""
+    """统一简繁体/空白，优先精确标题；多开时不擅自挑一个。"""
+    def normalized(title: str) -> str:
+        return "".join(unicodedata.normalize("NFKC", title).casefold().split()).replace("玛", "瑪")
+
     candidates = list(windows)
-    expected = MABINOGI_M_WINDOW_TITLE.casefold()
+    expected = normalized(MABINOGI_M_WINDOW_TITLE)
+    exact = [item for item in candidates if normalized(item.title) == expected]
+    matches = exact or [item for item in candidates if normalized(item.title).startswith(expected + "-")]
+    return matches[0] if len(matches) == 1 else None
+
+
+def select_target_window(windows: Iterable[WindowInfo], handle: int = 0, title: str = "") -> WindowInfo | None:
+    """发现阶段保留明确选择；句柄复用或同名多开时不能错绑。"""
+    candidates = list(windows)
     for item in candidates:
-        if item.title.strip().casefold() == expected:
+        if item.handle == handle and (not title or item.title == title):
             return item
-    return next((item for item in candidates if expected in item.title.casefold()), None)
+    same_title = [item for item in candidates if title and item.title == title]
+    if len(same_title) == 1:
+        return same_title[0]
+    return find_mabinogi_mobile_window(candidates)
 
 
 def _require_windows() -> None:
@@ -312,14 +402,15 @@ def _require_windows() -> None:
         raise RuntimeError("指定窗口模式仅支持 Windows。")
 
 
-def get_window_info(handle: int) -> WindowInfo | None:
-    """返回一个可见顶级窗口的信息；失效的句柄返回 None。"""
+def get_window_info(handle: int, *, include_minimized: bool = False) -> WindowInfo | None:
+    """执行默认排除最小化窗口；仅发现列表可显式包含它们。"""
     _require_windows()
     if not handle or not _user32.IsWindow(wintypes.HWND(handle)):
         return None
     if not _user32.IsWindowVisible(wintypes.HWND(handle)):
         return None
-    if _user32.IsIconic(wintypes.HWND(handle)):
+    minimized = bool(_user32.IsIconic(wintypes.HWND(handle)))
+    if minimized and not include_minimized:
         return None
     title_length = _user32.GetWindowTextLengthW(wintypes.HWND(handle))
     if title_length <= 0:
@@ -327,23 +418,30 @@ def get_window_info(handle: int) -> WindowInfo | None:
     title_buffer = ctypes.create_unicode_buffer(title_length + 1)
     _user32.GetWindowTextW(wintypes.HWND(handle), title_buffer, len(title_buffer))
     rect = wintypes.RECT()
-    if not _user32.GetWindowRect(wintypes.HWND(handle), ctypes.byref(rect)):
+    if minimized:
+        # 最小化矩形只有任务栏图标大小，不能当作游戏分辨率。
+        import win32gui
+        try:
+            rect = wintypes.RECT(*win32gui.GetWindowPlacement(handle)[4])
+        except win32gui.error:
+            return None
+    elif not _user32.GetWindowRect(wintypes.HWND(handle), ctypes.byref(rect)):
         return None
     width, height = rect.right - rect.left, rect.bottom - rect.top
     if width < 80 or height < 80:
         return None
-    return WindowInfo(handle, title_buffer.value, rect.left, rect.top, width, height)
+    return WindowInfo(handle, title_buffer.value, rect.left, rect.top, width, height, minimized)
 
 
-def list_target_windows() -> list[WindowInfo]:
-    """枚举可由用户选择的可见顶级窗口。"""
+def list_target_windows(*, include_minimized: bool = False) -> list[WindowInfo]:
+    """枚举目标；UI 可包含最小化窗口，执行通路仍只返回可截图窗口。"""
     _require_windows()
     windows: list[WindowInfo] = []
     callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
     @callback_type
     def callback(handle: wintypes.HWND, _parameter: wintypes.LPARAM) -> bool:
-        info = get_window_info(int(handle))
+        info = get_window_info(int(handle), include_minimized=include_minimized)
         if info is not None:
             windows.append(info)
         return True

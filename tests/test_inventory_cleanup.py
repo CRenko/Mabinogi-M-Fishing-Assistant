@@ -134,6 +134,11 @@ class InventoryCleanupFlowTests(unittest.TestCase):
         )
         self.frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
         self.match = TemplateMatch(1700, 760, 130, 82, 0.96, 1.0)
+        # 新入口先看一帧；后续动作仍由各测试的页面序列驱动。
+        for name, value in (("_capture_stamina_frame", self.frame), ("_detect_cleanup_entry", None)):
+            mocked = patch.object(self.engine, name, return_value=value)
+            mocked.start()
+            self.addCleanup(mocked.stop)
 
     def test_full_safe_flow_selects_four_categories_then_resumes(self) -> None:
         initial_on = _simple_state(
@@ -252,7 +257,7 @@ class InventoryCleanupFlowTests(unittest.TestCase):
             self.engine._cleanup_test_requested.is_set()  # type: ignore[attr-defined]
         )
 
-    @patch("fishing_assistant.engine.pyautogui.press")
+    @patch("pyautogui.press")
     def test_synthetic_screen_esc_does_not_trigger_emergency_stop(
         self, press
     ) -> None:

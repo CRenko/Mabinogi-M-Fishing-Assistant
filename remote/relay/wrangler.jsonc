@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ok-fishing-relay",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-02-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vars": { "MAX_DEVICES": "25", "SERVICE_NAME": "OK 钓鱼远程查看" },
+  "d1_databases": [{
+    "binding": "DB", "database_name": "fishing-remote",
+    "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+    "migrations_dir": "migrations"
+  }],
+  "ratelimits": [
+    { "name": "IP_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "DEVICE_LIMIT", "namespace_id": "1002", "simple": { "limit": 4, "period": 60 } }
+  ]
+}
