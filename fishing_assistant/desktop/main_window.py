@@ -86,6 +86,7 @@ class MainWindow(
         self._last_snapshot_path: Path | None = None
         self._last_snapshot_bundle: Path | None = None
         self._floating_crafting_session = False
+        self._fishing_stats_session_id = 0
         self.floating_status_bar = FloatingStatusBar()
         self.floating_status_bar.pause_requested.connect(self._pause_from_floating)
         self.floating_status_bar.resume_requested.connect(self._resume_from_floating)

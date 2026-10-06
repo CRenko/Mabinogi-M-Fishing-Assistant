@@ -45,6 +45,20 @@ class HelpPageMixin:
             card_layout.addWidget(label)
         layout.addWidget(card)
 
+        fishing_stats = Card()
+        fishing_stats_layout = QVBoxLayout(fishing_stats)
+        configure_card_layout(fishing_stats_layout)
+        fishing_stats_layout.addLayout(self._card_heading("本次钓鱼记录"))
+        fishing_stats_label = QLabel(
+            "控制台和悬浮栏会显示本次自动钓鱼的正确、失败次数。每次成功启动时清零，停止后保留；"
+            "自动收杆并结束当前目标计为正确，识别到跑鱼提示或已确认体力条但未完成收鱼计为失败。"
+            "未确认的误识别不计入。"
+        )
+        fishing_stats_label.setWordWrap(True)
+        fishing_stats_label.setObjectName("helpStep")
+        fishing_stats_layout.addWidget(fishing_stats_label)
+        layout.addWidget(fishing_stats)
+
         window_help = Card()
         window_layout = QVBoxLayout(window_help)
         configure_card_layout(window_layout)

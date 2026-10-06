@@ -195,6 +195,21 @@ class DashboardPageMixin:
         shortcuts.setObjectName("helper")
         shortcuts.setWordWrap(True)
         layout.addWidget(shortcuts)
+
+        layout.addLayout(self._card_heading("本次钓鱼"))
+        fishing_counts = QGridLayout()
+        fishing_counts.setHorizontalSpacing(12)
+        self.fishing_success_metric = MetricCard("正确钓鱼", "0 次")
+        self.fishing_failure_metric = MetricCard("失败钓鱼", "0 次")
+        self.fishing_success_metric.setToolTip(
+            "本次自动钓鱼已完成收杆的次数；下一次启动时清零。"
+        )
+        self.fishing_failure_metric.setToolTip(
+            "本次自动钓鱼中明确跑鱼或已确认体力条但未完成收鱼的次数。"
+        )
+        fishing_counts.addWidget(self.fishing_success_metric, 0, 0)
+        fishing_counts.addWidget(self.fishing_failure_metric, 0, 1)
+        layout.addLayout(fishing_counts)
         return card
 
     def _build_detection_status_card(self) -> Card:

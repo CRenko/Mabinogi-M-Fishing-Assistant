@@ -28,7 +28,7 @@ class FloatingStatusBar(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setObjectName("floatingStatus")
         self.setWindowTitle("洛奇 M 钓鱼助手 · 后台状态")
-        self.setFixedSize(352, 126)
+        self.setFixedSize(352, 140)
         self._drag_offset = None
         self._positioned = False
         self._theme = "night"
@@ -64,6 +64,14 @@ class FloatingStatusBar(QWidget):
         states.addWidget(self.runtime_label, 1)
         layout.addLayout(states)
 
+        self.fishing_session_label = QLabel("本次钓鱼 · 正确 0 次  |  失败 0 次")
+        self.fishing_session_label.setObjectName("floatingHint")
+        self.fishing_session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.fishing_session_label.setToolTip(
+            "显示本次自动钓鱼的正确次数和失败次数；下次启动时重新统计。"
+        )
+        layout.addWidget(self.fishing_session_label)
+
         actions = QHBoxLayout()
         actions.setSpacing(12)
         actions.addStretch(1)
@@ -87,7 +95,13 @@ class FloatingStatusBar(QWidget):
         layout.addLayout(actions)
         self.set_task_controls(False, False)
 
-        for label in (title, hint, self.calibration_label, self.runtime_label):
+        for label in (
+            title,
+            hint,
+            self.calibration_label,
+            self.runtime_label,
+            self.fishing_session_label,
+        ):
             label.setAttribute(
                 Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
             )
@@ -120,6 +134,11 @@ class FloatingStatusBar(QWidget):
             f"运行 · {text}",
         )
         self.runtime_label.setToolTip(text)
+
+    def set_fishing_session_stats(self, successful: int, failed: int) -> None:
+        self.fishing_session_label.setText(
+            f"本次钓鱼 · 正确 {successful} 次  |  失败 {failed} 次"
+        )
 
     def set_theme(self, theme: str) -> None:
         self._theme = "day" if theme == "day" else "night"
