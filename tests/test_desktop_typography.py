@@ -45,7 +45,7 @@ class TypographyTests(unittest.TestCase):
         ]):
             self.window = MainWindow(self.engine)
         self.window.setFont(ui_font())
-        self.window.resize(920, 680)
+        self.window.resize(900, 680)
         self.window.show()
         self.app.processEvents()
 

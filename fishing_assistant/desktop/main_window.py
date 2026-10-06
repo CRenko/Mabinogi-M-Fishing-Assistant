@@ -94,8 +94,8 @@ class MainWindow(
         self.setWindowTitle(APP_NAME)
         if APP_ICON_PATH.exists():
             self.setWindowIcon(QIcon(str(APP_ICON_PATH)))
-        self.setMinimumSize(920, 680)
-        self.resize(980, 760)
+        self.setMinimumSize(1080, 680)
+        self.resize(1080, 760)
         # 页面构建时就会 polish 控件。先用保存的主题，避免首帧缓存夜间颜色。
         self.setStyleSheet(DAY_STYLE if self.engine.config().ui_theme == "day" else NIGHT_STYLE)
 

@@ -7,7 +7,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QFontDatabase, QWheelEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QComboBox, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QComboBox,
+    QFrame,
+    QSizePolicy,
+    QWidget,
+)
 
 from fishing_assistant.config import AppConfig
 from fishing_assistant.desktop.design import ui_font
@@ -121,7 +128,7 @@ class DesktopLayoutTests(unittest.TestCase):
         page = self.window.stack.widget(0)
         for theme in ("day", "night"):
             self.window._apply_theme(theme)
-            for size in ((980, 760), (920, 680)):
+            for size in ((980, 760), (900, 680)):
                 self.window.resize(*size)
                 page.verticalScrollBar().setValue(0)
                 self.app.processEvents()
@@ -134,6 +141,39 @@ class DesktopLayoutTests(unittest.TestCase):
                 sizes = [x.size() for x in (self.window.runtime_state_chip, self.window.theme_button, self.window.status_chip)]
                 self.assertEqual(sizes[0], sizes[1])
                 self.assertEqual(sizes[1], sizes[2])
+
+    def test_dashboard_cards_expand_with_available_window_width(self):
+        page = self.window.stack.widget(0)
+        canvas = page.widget()
+        cards = [
+            widget
+            for widget in canvas.findChildren(QFrame, "card")
+            if widget.parentWidget() is canvas
+        ]
+        self.assertEqual(len(cards), 4)
+        self.window.resize(900, 680)
+        self.app.processEvents()
+        narrow_widths = [card.width() for card in cards]
+        self.assertEqual(self.window.width(), 900)
+        self.assertEqual(page.horizontalScrollBar().maximum(), 0)
+        self.assertTrue(
+            all(card.width() >= card.minimumSizeHint().width() for card in cards)
+        )
+
+        self.window.resize(1200, 760)
+        self.app.processEvents()
+        wide_widths = [card.width() for card in cards]
+
+        self.assertTrue(
+            all(wide > narrow for narrow, wide in zip(narrow_widths, wide_widths))
+        )
+        self.assertTrue(
+            all(
+                card.sizePolicy().horizontalPolicy()
+                == QSizePolicy.Policy.Expanding
+                for card in cards
+            )
+        )
 
     def test_foreground_mode_exposes_display_configuration(self):
         self.assertTrue(self.window.profile_details.content.isHidden())
