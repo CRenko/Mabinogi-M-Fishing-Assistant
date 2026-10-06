@@ -63,6 +63,7 @@ class TaskControlMixin:
             # 先撤销送键资格，再重置识别数据，避免旧帧趁重置期间继续动作。
             self._interrupt_generation += 1
             self._enabled.clear()
+            self._fishing_session_active = False
             self._paused.clear()
             self._cleanup_test_requested.clear()
             request = self._craft_request
@@ -118,6 +119,7 @@ class TaskControlMixin:
             if generation != self._interrupt_generation or self._shutdown.is_set():
                 return False
             self._enabled.set()
+            self._start_fishing_session()
             self._schedule_recast(time.monotonic(), config, "监测启动")
             self._emit(EventKind.INFO, self._monitoring_details(config), monitoring=True)
             self._emit_environment_warnings(config)
@@ -130,6 +132,34 @@ class TaskControlMixin:
             )
             self._emit(EventKind.STATE, message, monitoring=True)
         return True
+
+    def _start_fishing_session(self) -> None:
+        self._fishing_session_id += 1
+        self._successful_fishing_count = 0
+        self._failed_fishing_count = 0
+        self._fishing_session_active = True
+        self._emit_fishing_session_stats()
+
+    def _record_fishing_session_result(self, *, success: bool) -> None:
+        if not self._fishing_session_active or not self._enabled.is_set():
+            return
+        generation = getattr(self._work_context, "generation", None)
+        if generation is not None and not self._operation_active(generation):
+            return
+        if success:
+            self._successful_fishing_count += 1
+        else:
+            self._failed_fishing_count += 1
+        self._emit_fishing_session_stats()
+
+    def _emit_fishing_session_stats(self) -> None:
+        self._emit(
+            EventKind.FISHING_SESSION_STATS,
+            "本次自动钓鱼记录已更新。",
+            fishing_session_id=self._fishing_session_id,
+            successful_fishing_count=self._successful_fishing_count,
+            failed_fishing_count=self._failed_fishing_count,
+        )
 
     def toggle_monitoring(self) -> None:
         # F8 始终保留启停语义；悬浮栏“继续”不等于重新启动其他任务。

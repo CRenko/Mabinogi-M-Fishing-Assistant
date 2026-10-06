@@ -263,6 +263,7 @@ class FishingFlowMixin:
         self._escape_candidate_stamina_seen = False
         self._reset_stamina_tracking()
 
+        self._record_fishing_session_result(success=False)
         learned_seconds = round(elapsed, 2)
         self.update_config(learned_escape_seconds=learned_seconds)
         target, margin = self.learned_collect_timing(learned_seconds)
@@ -296,6 +297,8 @@ class FishingFlowMixin:
         self._escape_watch_until = 0.0
         self._escape_candidate_elapsed = 0.0
         self._escape_candidate_stamina_seen = False
+        if stamina_seen:
+            self._record_fishing_session_result(success=False)
         if ready_visible:
             self._schedule_recast(
                 now, config, "可抛竿鱼竿图标已恢复"

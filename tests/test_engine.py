@@ -1265,6 +1265,69 @@ class FishingEngineTests(unittest.TestCase):
             {"left": 3440, "top": 1740, "width": 320, "height": 360},
         )
 
+    def test_fishing_session_counts_reset_on_each_successful_start(self) -> None:
+        events = []
+        engine = FishingEngine(events.append)
+        engine._config = AppConfig(button_center=(10, 10), capture_mode="screen")
+        with (
+            patch.object(engine, "_prepare_stamina_view"),
+            patch.object(engine, "_schedule_recast"),
+            patch.object(engine, "_emit_environment_warnings"),
+        ):
+            self.assertTrue(engine.set_monitoring(True))
+            engine._record_fishing_session_result(success=True)
+            engine._record_fishing_session_result(success=False)
+            self.assertTrue(engine.set_monitoring(False))
+            self.assertEqual(engine._successful_fishing_count, 1)
+            self.assertEqual(engine._failed_fishing_count, 1)
+
+            self.assertTrue(engine.set_monitoring(True))
+
+        stats_events = [
+            event
+            for event in events
+            if event.kind == EventKind.FISHING_SESSION_STATS
+        ]
+        self.assertEqual(stats_events[-1].fishing_session_id, 2)
+        self.assertEqual(stats_events[-1].successful_fishing_count, 0)
+        self.assertEqual(stats_events[-1].failed_fishing_count, 0)
+        engine.set_monitoring(False)
+
+    def test_session_counts_confirmed_catch_and_escape_failure_once(self) -> None:
+        events = []
+        engine = FishingEngine(events.append)
+        engine._config = AppConfig(button_center=(10, 10), capture_mode="screen")
+        with (
+            patch.object(engine, "_prepare_stamina_view"),
+            patch.object(engine, "_schedule_recast"),
+            patch.object(engine, "_emit_environment_warnings"),
+            patch.object(engine, "update_config"),
+            patch("fishing_assistant.automation.fishing.record_error"),
+        ):
+            self.assertTrue(engine.set_monitoring(True))
+            engine._work_context.generation = engine._interrupt_generation
+            engine._waiting_for_clear = True
+            engine._process_frame(0, AppConfig(), IconState.READY_TO_CAST)
+            self.assertEqual(engine._successful_fishing_count, 1)
+
+            engine._fish_resolution_pending = True
+            engine._hook_started_at = 100.0
+            self.assertTrue(
+                engine._record_escape_failure(102.0, AppConfig(), 0.9)
+            )
+
+        self.assertEqual(engine._successful_fishing_count, 1)
+        self.assertEqual(engine._failed_fishing_count, 1)
+        self.assertEqual(
+            [
+                (event.successful_fishing_count, event.failed_fishing_count)
+                for event in events
+                if event.kind == EventKind.FISHING_SESSION_STATS
+            ],
+            [(0, 0), (1, 0), (1, 1)],
+        )
+        engine.set_monitoring(False)
+
 
 if __name__ == "__main__":
     unittest.main()

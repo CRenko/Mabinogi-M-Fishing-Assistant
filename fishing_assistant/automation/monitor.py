@@ -347,9 +347,11 @@ class MonitorMixin:
             if icon_state == IconState.READY_TO_CAST:
                 self._waiting_for_clear = False
                 self._clear_frames = 0
+                self._record_fishing_session_result(success=True)
                 self._schedule_recast(now, config, "收鱼完成，钓鱼图标已恢复")
             elif self._clear_frames >= config.clear_consecutive_frames:
                 self._waiting_for_clear = False
+                self._record_fishing_session_result(success=True)
                 self._schedule_recast(now, config, "收鱼完成")
         elif self._fish_resolution_pending:
             strategy = self._catch_strategy(config)

@@ -166,6 +166,10 @@ class FishingEngine(
         self._shadow_prev_icon: IconState | None = None
         self._fish_resolution_pending = False
         self._hook_started_at: float | None = None
+        self._fishing_session_id = 0
+        self._successful_fishing_count = 0
+        self._failed_fishing_count = 0
+        self._fishing_session_active = False
         self._stamina_peak_width = 0
         self._stamina_last_width = 0
         self._stamina_low_seen = False
