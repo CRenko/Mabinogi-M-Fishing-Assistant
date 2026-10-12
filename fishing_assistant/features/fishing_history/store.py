@@ -29,7 +29,7 @@ class FishingHistorySummary:
     catch_count: int
     ordinary_count: int
     failure_count: int
-    average_duration_seconds: float
+    total_duration_seconds: float
 
     @property
     def total_rounds(self) -> int:
@@ -169,10 +169,11 @@ class FishingHistoryStore:
                        COALESCE(SUM(ordinary_count), 0),
                        COALESCE(SUM(failure_count), 0),
                        COALESCE(
-                           AVG((julianday(ended_at) - julianday(started_at)) * 86400),
+                           SUM((julianday(ended_at) - julianday(started_at)) * 86400),
                            0
                        )
                 FROM fishing_sessions
+                WHERE status = 'completed'
                 """
             ).fetchone()
         return FishingHistorySummary(
@@ -180,7 +181,7 @@ class FishingHistoryStore:
             catch_count=int(row[1]),
             ordinary_count=int(row[2]),
             failure_count=int(row[3]),
-            average_duration_seconds=float(row[4]),
+            total_duration_seconds=float(row[4]),
         )
 
     def close(self) -> None:

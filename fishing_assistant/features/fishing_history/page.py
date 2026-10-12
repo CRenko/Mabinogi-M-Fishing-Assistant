@@ -5,6 +5,7 @@ from datetime import datetime
 import sqlite3
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QGridLayout,
     QHeaderView,
@@ -68,7 +69,7 @@ class FishingHistoryPage(QScrollArea):
         self.ordinary_metric = MetricCard("普通成功", "0")
         self.failure_metric = MetricCard("失败", "0")
         self.success_rate_metric = MetricCard("成功占比", "0%")
-        self.average_duration_metric = MetricCard("平均会话时长", "0 秒")
+        self.total_duration_metric = MetricCard("总钓鱼时间", "0 秒")
         for index, metric in enumerate(
             (
                 self.session_metric,
@@ -77,7 +78,7 @@ class FishingHistoryPage(QScrollArea):
                 self.ordinary_metric,
                 self.failure_metric,
                 self.success_rate_metric,
-                self.average_duration_metric,
+                self.total_duration_metric,
             )
         ):
             metrics.addWidget(metric, index // 4, index % 4)
@@ -93,6 +94,7 @@ class FishingHistoryPage(QScrollArea):
         self.error_label.hide()
         history_layout.addWidget(self.error_label)
         self.table = QTableWidget(0, 7)
+        self.table.setObjectName("fishingHistoryTable")
         self.table.setHorizontalHeaderLabels(
             ("开始时间", "结束时间", "上鱼成功", "普通成功", "失败", "时长", "状态")
         )
@@ -100,6 +102,7 @@ class FishingHistoryPage(QScrollArea):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.setMinimumWidth(0)
+        self.table.verticalHeader().setObjectName("fishingHistoryRowHeader")
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         for column, width in enumerate((155, 155, 82, 82, 70, 100, 96)):
@@ -109,6 +112,7 @@ class FishingHistoryPage(QScrollArea):
         history_layout.addWidget(self.table)
         layout.addWidget(history_card)
         layout.addStretch(1)
+        self._theme = "night"
         self.refresh()
 
     @staticmethod
@@ -161,6 +165,22 @@ class FishingHistoryPage(QScrollArea):
         }
         return reasons.get(record.end_reason, "已结束")
 
+    def set_theme(self, theme: str) -> None:
+        self._theme = theme
+        catch_color, failure_color = (
+            (QColor("#75E4BE"), QColor("#FFB7A5"))
+            if theme == "night"
+            else (QColor("#107450"), QColor("#A23825"))
+        )
+        for row in range(self.table.rowCount()):
+            for column, color in ((2, catch_color), (3, catch_color), (4, failure_color)):
+                item = self.table.item(row, column)
+                if item is not None:
+                    item.setForeground(color)
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+
     def refresh(self) -> None:
         try:
             summary = self.engine.fishing_history_summary()
@@ -179,11 +199,17 @@ class FishingHistoryPage(QScrollArea):
         self.success_rate_metric.value_label.setText(
             f"{summary.success_rate:.1%}"
         )
-        self.average_duration_metric.value_label.setText(
-            f"{summary.average_duration_seconds / 60:.1f} 分"
-            if summary.average_duration_seconds >= 60
-            else f"{summary.average_duration_seconds:.0f} 秒"
+        total_seconds = int(summary.total_duration_seconds)
+        total_minutes, seconds = divmod(total_seconds, 60)
+        hours, minutes = divmod(total_minutes, 60)
+        duration = (
+            f"{hours} 小时 {minutes} 分"
+            if hours
+            else f"{minutes} 分"
+            if minutes
+            else f"{seconds} 秒"
         )
+        self.total_duration_metric.value_label.setText(duration)
 
         self.table.setRowCount(len(records))
         for row_index, record in enumerate(records):
@@ -201,3 +227,4 @@ class FishingHistoryPage(QScrollArea):
                 if column in (2, 3, 4):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table.setItem(row_index, column, item)
+        self.set_theme(self._theme)

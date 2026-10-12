@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fishing_assistant.automation.models import FishingResult
 from fishing_assistant.features.fishing_history.store import FishingHistoryStore
@@ -33,6 +34,29 @@ class FishingHistoryStoreTests(unittest.TestCase):
         self.assertEqual(summary.session_count, 1)
         self.assertEqual(summary.total_rounds, 3)
         self.assertEqual(summary.success_rate, 2 / 3)
+
+    def test_summary_reports_total_completed_fishing_time(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = FishingHistoryStore(Path(directory) / "history.sqlite3")
+            timestamps = iter(
+                (
+                    "2026-10-12T09:59:00+00:00",
+                    "2026-10-12T10:00:00+00:00",
+                    "2026-10-12T10:30:00+00:00",
+                    "2026-10-12T11:00:00+00:00",
+                    "2026-10-12T11:45:00+00:00",
+                )
+            )
+            with patch.object(store, "_now", side_effect=lambda: next(timestamps)):
+                first_session = store.start_session()
+                store.finish_session(first_session, "stopped")
+                second_session = store.start_session()
+                store.finish_session(second_session, "stopped")
+
+            summary = store.summary()
+            store.close()
+
+        self.assertAlmostEqual(summary.total_duration_seconds, 75 * 60, places=2)
 
     def test_open_session_is_marked_interrupted_on_next_startup(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

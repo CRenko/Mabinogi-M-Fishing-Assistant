@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -267,10 +268,19 @@ class UiRegressionTests(unittest.TestCase):
             self.assertEqual(page.session_metric.value_label.text(), "1")
             self.assertEqual(page.round_metric.value_label.text(), "3")
             self.assertEqual(page.success_rate_metric.value_label.text(), "66.7%")
+            self.assertEqual(page.total_duration_metric.value_label.text(), "0 秒")
             self.assertEqual(page.table.rowCount(), 1)
             self.assertEqual(page.table.item(0, 2).text(), "1")
             self.assertEqual(page.table.item(0, 3).text(), "1")
             self.assertEqual(page.table.item(0, 4).text(), "1")
+            page.set_theme("night")
+            self.assertEqual(page.table.item(0, 2).foreground().color().name(), "#75e4be")
+            self.assertEqual(page.table.item(0, 3).foreground().color().name(), "#75e4be")
+            self.assertEqual(page.table.item(0, 4).foreground().color().name(), "#ffb7a5")
+            self.assertTrue(page.table.item(0, 2).font().bold())
+            page.set_theme("day")
+            self.assertEqual(page.table.item(0, 2).foreground().color().name(), "#107450")
+            self.assertEqual(page.table.item(0, 4).foreground().color().name(), "#a23825")
             self.assertEqual(page.table.item(0, 6).text(), "手动停止")
         finally:
             page.close()
@@ -360,10 +370,45 @@ class UiRegressionTests(unittest.TestCase):
                 ("day", "#e0f7ee", "#edf2f7"),
             ):
                 window._apply_theme(theme)
+                self.app.processEvents()
                 style = window.styleSheet().lower()
+                table = window.fishing_history_page.table
+                table.ensurePolished()
+                table_palette = table.palette()
+                expected_table_colors = (
+                    ("#0d192a", "#dde8f5", "#111d2f")
+                    if theme == "night"
+                    else ("#ffffff", "#1c304a", "#f4f8fc")
+                )
+                self.assertEqual(
+                    table_palette.color(QPalette.ColorRole.Base).name(),
+                    expected_table_colors[0],
+                )
+                self.assertEqual(
+                    table_palette.color(QPalette.ColorRole.Text).name(),
+                    expected_table_colors[1],
+                )
+                self.assertEqual(
+                    table_palette.color(QPalette.ColorRole.AlternateBase).name(),
+                    expected_table_colors[2],
+                )
+                self.assertEqual(table.objectName(), "fishingHistoryTable")
+                self.assertEqual(
+                    table.verticalHeader().objectName(),
+                    "fishingHistoryRowHeader",
+                )
                 self.assertIn(
                     "qpushbutton#floatingstatusbutton:checked", style
                 )
+                self.assertIn(
+                    "qtablewidget#fishinghistorytable qheaderview::section",
+                    style,
+                )
+                self.assertIn(
+                    "qheaderview#fishinghistoryrowheader::section",
+                    style,
+                )
+                self.assertIn("qtablecornerbutton::section", style)
                 self.assertIn(on_color, style)
                 self.assertIn(off_color, style)
                 window.floating_status_button.setChecked(True)
