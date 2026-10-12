@@ -1284,6 +1284,7 @@ class FishingEngineTests(unittest.TestCase):
             self.assertEqual(engine._failed_fishing_count, 1)
 
             self.assertTrue(engine.set_monitoring(True))
+            self.assertTrue(engine.set_monitoring(False))
 
         stats_events = [
             event
@@ -1294,7 +1295,13 @@ class FishingEngineTests(unittest.TestCase):
         self.assertEqual(stats_events[-1].successful_fishing_count, 0)
         self.assertEqual(stats_events[-1].ordinary_fishing_count, 0)
         self.assertEqual(stats_events[-1].failed_fishing_count, 0)
-        engine.set_monitoring(False)
+        history = engine.fishing_history_sessions()
+        self.assertEqual(len(history), 2)
+        self.assertTrue(all(record.ended_at is not None for record in history))
+        self.assertEqual(
+            (history[1].catch_count, history[1].ordinary_count, history[1].failure_count),
+            (1, 0, 1),
+        )
 
     def test_session_counts_confirmed_catch_and_escape_failure_once(self) -> None:
         events = []

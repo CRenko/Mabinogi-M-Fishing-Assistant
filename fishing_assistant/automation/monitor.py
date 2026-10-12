@@ -43,6 +43,7 @@ class MonitorMixin:
                         if self._operation_active(generation):
                             request[0].stop(f"自动制作异常，已停止：{error}", error=True)
                             self._enabled.clear()
+                            self._finish_fishing_session("automatic_error")
                             self._emit_crafting(request[0].progress(time.monotonic(), generation), log=True)
                         if self._craft_request is request and generation == self._interrupt_generation:
                             self._craft_request = None
@@ -179,6 +180,7 @@ class MonitorMixin:
                     else:
                         total_failures = consecutive_failures + 1
                         self._enabled.clear()
+                        self._finish_fishing_session("recognition_error")
                         self._emit(
                             EventKind.ERROR,
                             f"{source}已暂停：连续失败 {total_failures} 次，"
@@ -194,6 +196,7 @@ class MonitorMixin:
         except Exception as error:  # pragma: no cover - mss 初始化失败
             # 线程即将退出；必须同步清掉监测标志，避免界面停留在“监测中”假状态。
             self._enabled.clear()
+            self._finish_fishing_session("monitor_start_error")
             self._emit(EventKind.ERROR, f"无法启动识别服务：{error}")
         finally:
             self._work_context.generation = None
