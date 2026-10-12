@@ -271,7 +271,8 @@ class FishingEngineTests(unittest.TestCase):
             self.assertIsNotNone(engine._pending_recast_at)  # type: ignore[attr-defined]
             engine._process_frame(766, config, IconState.READY_TO_CAST)
             engine._process_frame(0, config, IconState.WAITING_BITE)
-        engine._enabled.clear()  # type: ignore[attr-defined]
+        engine.set_monitoring(False)
+        engine.close()
 
         press.assert_called_once_with("space")
         self.assertIsNone(engine._pending_recast_at)  # type: ignore[attr-defined]
@@ -298,7 +299,8 @@ class FishingEngineTests(unittest.TestCase):
             engine._process_frame(766, config, IconState.READY_TO_CAST)
             engine._process_frame(365, config, IconState.IDLE_RECOVERY)
 
-        engine._enabled.clear()  # type: ignore[attr-defined]
+        engine.set_monitoring(False)
+        engine.close()
         self.assertEqual(
             [call.args[0] for call in tap_key.call_args_list],
             ["w", "s"],
@@ -333,7 +335,8 @@ class FishingEngineTests(unittest.TestCase):
             press.assert_not_called()
             engine._process_frame(766, config, IconState.READY_TO_CAST)
 
-        engine._enabled.clear()  # type: ignore[attr-defined]
+        engine.set_monitoring(False)
+        engine.close()
         press.assert_called_once_with("space")
     def test_pending_recast_never_presses_waiting_bite_icon(self) -> None:
         config = AppConfig(press_cooldown_ms=0)
@@ -1302,6 +1305,7 @@ class FishingEngineTests(unittest.TestCase):
             (history[1].catch_count, history[1].ordinary_count, history[1].failure_count),
             (1, 0, 1),
         )
+        engine.close()
 
     def test_session_counts_confirmed_catch_and_escape_failure_once(self) -> None:
         events = []
@@ -1317,6 +1321,7 @@ class FishingEngineTests(unittest.TestCase):
             self.assertTrue(engine.set_monitoring(True))
             engine._work_context.generation = engine._interrupt_generation
             engine._waiting_for_clear = True
+            engine._fish_round_had_stamina = True
             engine._fish_round_collect_pressed = True
             engine._process_frame(0, AppConfig(), IconState.READY_TO_CAST)
             self.assertEqual(engine._successful_fishing_count, 1)
@@ -1343,6 +1348,7 @@ class FishingEngineTests(unittest.TestCase):
             [(0, 0, 0), (1, 0, 0), (1, 0, 1)],
         )
         engine.set_monitoring(False)
+        engine.close()
 
     def test_fishing_round_result_classification(self) -> None:
         engine = FishingEngine()
@@ -1371,6 +1377,23 @@ class FishingEngineTests(unittest.TestCase):
         engine._observe_stamina_bar(green)
         engine._observe_stamina_bar(
             StaminaBarSample(
+                107, (100, 100), midpoint_state=StaminaMidpointState.GREEN
+            )
+        )
+        engine._finish_uncollected_fishing_round()
+        self.assertEqual(engine._failed_fishing_count, 0)
+        self.assertEqual(engine._ordinary_fishing_count, 1)
+
+        engine._reset_fishing_round_tracking()
+        engine._observe_stamina_bar(
+            StaminaBarSample(120, (100, 100), midpoint_state=StaminaMidpointState.GREEN)
+        )
+        engine._observe_stamina_bar(dark)
+        engine._observe_stamina_bar(dark)
+        engine._observe_stamina_bar(green)
+        engine._observe_stamina_bar(green)
+        engine._observe_stamina_bar(
+            StaminaBarSample(
                 112, (100, 100), midpoint_state=StaminaMidpointState.GREEN
             )
         )
@@ -1384,6 +1407,31 @@ class FishingEngineTests(unittest.TestCase):
         self.assertEqual(engine._successful_fishing_count, 1)
         self.assertEqual(engine._ordinary_fishing_count, 1)
         self.assertEqual(engine._failed_fishing_count, 1)
+        engine.close()
+
+    def test_all_catch_strategies_track_shared_stamina_result_evidence(self) -> None:
+        sample = StaminaBarSample(
+            120, (100, 100), midpoint_state=StaminaMidpointState.GREEN
+        )
+        for strategy in ("stamina_bounce", "fixed_delay", "instant"):
+            with self.subTest(strategy=strategy):
+                engine = FishingEngine()
+                config = AppConfig(
+                    catch_strategy=strategy,
+                    capture_mode="screen",
+                    button_center=(10, 10),
+                    trigger_consecutive_frames=1,
+                    press_cooldown_ms=0,
+                )
+                with patch("pyautogui.press"):
+                    engine._process_frame(
+                        1985, config, IconState.FISH_HOOKED, stamina_sample=sample
+                    )
+                self.assertTrue(engine._fish_round_had_stamina)
+                if strategy == "instant":
+                    self.assertTrue(engine._waiting_for_clear)
+                else:
+                    self.assertTrue(engine._fish_resolution_pending)
 
 
 if __name__ == "__main__":

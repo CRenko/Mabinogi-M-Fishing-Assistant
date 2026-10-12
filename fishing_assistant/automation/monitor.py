@@ -353,11 +353,20 @@ class MonitorMixin:
             # 收杆后游戏会短暂直接恢复“可抛竿”图标。它是比普通清空帧
             # 更强的正向证据：首帧命中就立即续钓，避免 OK 全尺度扫描较慢
             # 时错过短暂图标，随后误等到指南针并执行不必要的 W → S。
-            if icon_state == IconState.READY_TO_CAST:
-                self._clear_frames = 0
+            stamina_gone = (
+                self._fish_round_had_stamina
+                and now - self._fish_round_last_stamina_at
+                >= self.STAMINA_LOST_GRACE_SECONDS
+            )
+            if icon_state == IconState.READY_TO_CAST and (
+                stamina_gone or not self._fish_round_had_stamina
+            ):
                 self._finish_collected_fishing_round()
                 self._schedule_recast(now, config, "收鱼完成，钓鱼图标已恢复")
-            elif self._clear_frames >= config.clear_consecutive_frames:
+            elif (
+                self._clear_frames >= config.clear_consecutive_frames
+                and (stamina_gone or not self._fish_round_had_stamina)
+            ):
                 self._finish_collected_fishing_round()
                 self._schedule_recast(now, config, "收鱼完成")
         elif self._fish_resolution_pending:
@@ -419,6 +428,12 @@ class MonitorMixin:
                     self._fish_resolution_pending = False
                     self._reset_stamina_tracking()
                     self._reset_fishing_round_tracking()
+                    self._emit(
+                        EventKind.WARNING,
+                        "钓鱼目标已消失，但本轮未确认体力条变化；"
+                        "为避免误分类，未计入上鱼成功、普通成功或失败。",
+                        monitoring=True,
+                    )
                 self._schedule_recast(now, config, "计时目标已消失")
             elif fish_visible and strategy == "fixed_delay":
                 hook_started = self._hook_started_at or now

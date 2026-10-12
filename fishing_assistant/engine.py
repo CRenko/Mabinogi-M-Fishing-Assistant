@@ -101,6 +101,7 @@ class FishingEngine(
     STAMINA_MIDPOINT_DARK_RATIO = 0.55
     STAMINA_MIDPOINT_DARK_CONFIRM_FRAMES = 2
     STAMINA_MIDPOINT_GREEN_CONFIRM_FRAMES = 2
+    STAMINA_FULL_RECOVERY_RATIO = 0.9
     STARTUP_IDLE_CONFIRM_FRAMES = 2
     ROD_REQUIRED_MATCH_THRESHOLD = 0.72
     INVENTORY_FULL_MATCH_THRESHOLD = 0.70
@@ -189,6 +190,7 @@ class FishingEngine(
         self._fish_round_full_recovered = False
         self._fish_round_initial_width = 0
         self._fish_round_collect_pressed = False
+        self._fish_round_last_stamina_at = 0.0
         self._stamina_peak_width = 0
         self._stamina_last_width = 0
         self._stamina_low_seen = False

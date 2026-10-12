@@ -339,6 +339,7 @@ class FishingFlowMixin:
         self._stamina_sample_count += 1
         observed_at = time.monotonic()
         self._last_stamina_seen_at = observed_at
+        self._fish_round_last_stamina_at = observed_at
         self._stamina_last_center = sample.center
         self._stamina_midpoint_state = state
 
@@ -356,10 +357,12 @@ class FishingFlowMixin:
         else:
             self._stamina_peak_width = max(previous_peak, width)
         self._stamina_last_width = width
+        # Tolerate fill-width measurement jitter while requiring a near-full refill.
         if (
             self._fish_round_rebounded
             and self._fish_round_initial_width > 0
-            and width >= self._fish_round_initial_width * 0.9
+            and width
+            >= self._fish_round_initial_width * self.STAMINA_FULL_RECOVERY_RATIO
         ):
             self._fish_round_full_recovered = True
 
@@ -451,7 +454,14 @@ class FishingFlowMixin:
         self._reset_fishing_round_tracking()
 
     def _finish_collected_fishing_round(self) -> None:
-        if self._fish_round_full_recovered:
+        if not self._fish_round_had_stamina:
+            self._emit(
+                EventKind.WARNING,
+                "收鱼操作后目标消失，但本轮未确认体力条；"
+                "为避免误分类，本轮未计入三类结果。",
+                monitoring=True,
+            )
+        elif self._fish_round_full_recovered:
             self._record_fishing_session_result(FishingResult.FAILURE)
         elif self._fish_round_collect_pressed:
             self._record_fishing_session_result(FishingResult.CATCH)
