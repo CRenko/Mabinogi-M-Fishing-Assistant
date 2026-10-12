@@ -151,11 +151,13 @@ class UiRegressionTests(unittest.TestCase):
         card = MainWindow._build_runtime_card(owner)  # type: ignore[arg-type]
         try:
             self.assertEqual(owner.fishing_success_metric.value_label.text(), "0 次")
+            self.assertEqual(owner.fishing_ordinary_metric.value_label.text(), "0 次")
             self.assertEqual(owner.fishing_failure_metric.value_label.text(), "0 次")
             labels = "\n".join(
                 label.text() for label in card.findChildren(QLabel)
             )
-            self.assertIn("正确钓鱼", labels)
+            self.assertIn("上鱼成功", labels)
+            self.assertIn("普通成功", labels)
             self.assertIn("失败钓鱼", labels)
         finally:
             card.close()
@@ -173,13 +175,13 @@ class UiRegressionTests(unittest.TestCase):
             )
             bar.set_calibrated(True)
             bar.set_runtime("等待上钩", "running")
-            bar.set_fishing_session_stats(3, 2)
+            bar.set_fishing_session_stats(3, 4, 2)
             bar.set_background_opacity(63)
             self.assertEqual(bar.calibration_label.text(), "校准 · 已完成")
             self.assertEqual(bar.runtime_label.text(), "运行 · 等待上钩")
             self.assertEqual(
                 bar.fishing_session_label.text(),
-                "本次钓鱼 · 正确 3 次  |  失败 2 次",
+                "本次钓鱼 · 上鱼 3 | 普通 4 | 失败 2",
             )
             self.assertEqual(bar.runtime_label.property("state"), "running")
             self.assertEqual(bar.background_opacity(), 63)
@@ -197,6 +199,7 @@ class UiRegressionTests(unittest.TestCase):
             _sync_floating_task_controls=lambda: None,
             _fishing_stats_session_id=0,
             fishing_success_metric=SimpleNamespace(value_label=QLabel("0 次")),
+            fishing_ordinary_metric=SimpleNamespace(value_label=QLabel("0 次")),
             fishing_failure_metric=SimpleNamespace(value_label=QLabel("0 次")),
             floating_status_bar=bar,
         )
@@ -208,10 +211,12 @@ class UiRegressionTests(unittest.TestCase):
                     "统计更新",
                     fishing_session_id=2,
                     successful_fishing_count=4,
+                    ordinary_fishing_count=3,
                     failed_fishing_count=1,
                 ),
             )
             self.assertEqual(owner.fishing_success_metric.value_label.text(), "4 次")
+            self.assertEqual(owner.fishing_ordinary_metric.value_label.text(), "3 次")
             self.assertEqual(owner.fishing_failure_metric.value_label.text(), "1 次")
 
             MainWindow._consume_engine_event(
@@ -221,12 +226,14 @@ class UiRegressionTests(unittest.TestCase):
                     "旧统计",
                     fishing_session_id=1,
                     successful_fishing_count=99,
+                    ordinary_fishing_count=99,
                     failed_fishing_count=99,
                 ),
             )
             self.assertEqual(owner.fishing_success_metric.value_label.text(), "4 次")
+            self.assertEqual(owner.fishing_ordinary_metric.value_label.text(), "3 次")
             self.assertEqual(owner.fishing_failure_metric.value_label.text(), "1 次")
-            self.assertIn("正确 4 次", bar.fishing_session_label.text())
+            self.assertIn("上鱼 4", bar.fishing_session_label.text())
         finally:
             bar.close()
 

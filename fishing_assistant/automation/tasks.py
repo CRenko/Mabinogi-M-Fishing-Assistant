@@ -4,7 +4,7 @@ from __future__ import annotations
 import pyautogui
 import time
 from fishing_assistant import window_target
-from fishing_assistant.automation.models import EventKind
+from fishing_assistant.automation.models import EventKind, FishingResult
 
 
 class TaskControlMixin:
@@ -136,18 +136,22 @@ class TaskControlMixin:
     def _start_fishing_session(self) -> None:
         self._fishing_session_id += 1
         self._successful_fishing_count = 0
+        self._ordinary_fishing_count = 0
         self._failed_fishing_count = 0
         self._fishing_session_active = True
+        self._reset_fishing_round_tracking()
         self._emit_fishing_session_stats()
 
-    def _record_fishing_session_result(self, *, success: bool) -> None:
+    def _record_fishing_session_result(self, result: FishingResult) -> None:
         if not self._fishing_session_active or not self._enabled.is_set():
             return
         generation = getattr(self._work_context, "generation", None)
         if generation is not None and not self._operation_active(generation):
             return
-        if success:
+        if result == FishingResult.CATCH:
             self._successful_fishing_count += 1
+        elif result == FishingResult.ORDINARY:
+            self._ordinary_fishing_count += 1
         else:
             self._failed_fishing_count += 1
         self._emit_fishing_session_stats()
@@ -158,8 +162,17 @@ class TaskControlMixin:
             "本次自动钓鱼记录已更新。",
             fishing_session_id=self._fishing_session_id,
             successful_fishing_count=self._successful_fishing_count,
+            ordinary_fishing_count=self._ordinary_fishing_count,
             failed_fishing_count=self._failed_fishing_count,
         )
+
+    def _reset_fishing_round_tracking(self) -> None:
+        self._fish_round_had_stamina = False
+        self._fish_round_depleted = False
+        self._fish_round_rebounded = False
+        self._fish_round_full_recovered = False
+        self._fish_round_initial_width = 0
+        self._fish_round_collect_pressed = False
 
     def toggle_monitoring(self) -> None:
         # F8 始终保留启停语义；悬浮栏“继续”不等于重新启动其他任务。

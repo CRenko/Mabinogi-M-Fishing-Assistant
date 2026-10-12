@@ -25,6 +25,7 @@ from fishing_assistant.constants import (
 )
 from fishing_assistant.engine import (
     EventKind,
+    FishingResult,
     FishingEngine,
     IconColorSignals,
     IconState,
@@ -1275,10 +1276,11 @@ class FishingEngineTests(unittest.TestCase):
             patch.object(engine, "_emit_environment_warnings"),
         ):
             self.assertTrue(engine.set_monitoring(True))
-            engine._record_fishing_session_result(success=True)
-            engine._record_fishing_session_result(success=False)
+            engine._record_fishing_session_result(FishingResult.CATCH)
+            engine._record_fishing_session_result(FishingResult.FAILURE)
             self.assertTrue(engine.set_monitoring(False))
             self.assertEqual(engine._successful_fishing_count, 1)
+            self.assertEqual(engine._ordinary_fishing_count, 0)
             self.assertEqual(engine._failed_fishing_count, 1)
 
             self.assertTrue(engine.set_monitoring(True))
@@ -1290,6 +1292,7 @@ class FishingEngineTests(unittest.TestCase):
         ]
         self.assertEqual(stats_events[-1].fishing_session_id, 2)
         self.assertEqual(stats_events[-1].successful_fishing_count, 0)
+        self.assertEqual(stats_events[-1].ordinary_fishing_count, 0)
         self.assertEqual(stats_events[-1].failed_fishing_count, 0)
         engine.set_monitoring(False)
 
@@ -1307,6 +1310,7 @@ class FishingEngineTests(unittest.TestCase):
             self.assertTrue(engine.set_monitoring(True))
             engine._work_context.generation = engine._interrupt_generation
             engine._waiting_for_clear = True
+            engine._fish_round_collect_pressed = True
             engine._process_frame(0, AppConfig(), IconState.READY_TO_CAST)
             self.assertEqual(engine._successful_fishing_count, 1)
 
@@ -1317,16 +1321,62 @@ class FishingEngineTests(unittest.TestCase):
             )
 
         self.assertEqual(engine._successful_fishing_count, 1)
+        self.assertEqual(engine._ordinary_fishing_count, 0)
         self.assertEqual(engine._failed_fishing_count, 1)
         self.assertEqual(
             [
-                (event.successful_fishing_count, event.failed_fishing_count)
+                (
+                    event.successful_fishing_count,
+                    event.ordinary_fishing_count,
+                    event.failed_fishing_count,
+                )
                 for event in events
                 if event.kind == EventKind.FISHING_SESSION_STATS
             ],
-            [(0, 0), (1, 0), (1, 1)],
+            [(0, 0, 0), (1, 0, 0), (1, 0, 1)],
         )
         engine.set_monitoring(False)
+
+    def test_fishing_round_result_classification(self) -> None:
+        engine = FishingEngine()
+        engine._enabled.set()
+        engine._fishing_session_active = True
+        engine._observe_stamina_bar(
+            StaminaBarSample(120, (100, 100), midpoint_state=StaminaMidpointState.GREEN)
+        )
+        engine._finish_uncollected_fishing_round()
+        self.assertEqual(engine._ordinary_fishing_count, 1)
+        self.assertEqual(engine._failed_fishing_count, 0)
+
+        engine._reset_fishing_round_tracking()
+        engine._observe_stamina_bar(
+            StaminaBarSample(120, (100, 100), midpoint_state=StaminaMidpointState.GREEN)
+        )
+        dark = StaminaBarSample(
+            55, (100, 100), midpoint_state=StaminaMidpointState.DARK
+        )
+        engine._observe_stamina_bar(dark)
+        engine._observe_stamina_bar(dark)
+        green = StaminaBarSample(
+            65, (100, 100), midpoint_state=StaminaMidpointState.GREEN
+        )
+        engine._observe_stamina_bar(green)
+        engine._observe_stamina_bar(green)
+        engine._observe_stamina_bar(
+            StaminaBarSample(
+                112, (100, 100), midpoint_state=StaminaMidpointState.GREEN
+            )
+        )
+        engine._finish_uncollected_fishing_round()
+        self.assertEqual(engine._failed_fishing_count, 1)
+
+        engine._reset_fishing_round_tracking()
+        engine._fish_round_had_stamina = True
+        engine._fish_round_collect_pressed = True
+        engine._finish_collected_fishing_round()
+        self.assertEqual(engine._successful_fishing_count, 1)
+        self.assertEqual(engine._ordinary_fishing_count, 1)
+        self.assertEqual(engine._failed_fishing_count, 1)
 
 
 if __name__ == "__main__":

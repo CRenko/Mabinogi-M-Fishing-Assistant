@@ -15,6 +15,7 @@ from fishing_assistant.automation.models import (
     EngineEvent,
     EventCallback,
     EventKind,
+    FishingResult,
     IconColorSignals,
     IconState,
     StaminaBarSample,
@@ -168,8 +169,15 @@ class FishingEngine(
         self._hook_started_at: float | None = None
         self._fishing_session_id = 0
         self._successful_fishing_count = 0
+        self._ordinary_fishing_count = 0
         self._failed_fishing_count = 0
         self._fishing_session_active = False
+        self._fish_round_had_stamina = False
+        self._fish_round_depleted = False
+        self._fish_round_rebounded = False
+        self._fish_round_full_recovered = False
+        self._fish_round_initial_width = 0
+        self._fish_round_collect_pressed = False
         self._stamina_peak_width = 0
         self._stamina_last_width = 0
         self._stamina_low_seen = False

@@ -20,6 +20,13 @@ class EventKind(str, Enum):
     STATE = "state"
     DIAGNOSTIC = "diagnostic"
 
+class FishingResult(str, Enum):
+    """One resolved fishing round."""
+
+    CATCH = "catch"
+    ORDINARY = "ordinary"
+    FAILURE = "failure"
+
 class IconState(str, Enum):
     NORMAL = "normal"
     READY_TO_CAST = "ready_to_cast"
@@ -88,6 +95,7 @@ class EngineEvent:
     crafting_log: bool = False
     fishing_session_id: int = 0
     successful_fishing_count: int = 0
+    ordinary_fishing_count: int = 0
     failed_fishing_count: int = 0
 
 EventCallback = Callable[[EngineEvent], None]

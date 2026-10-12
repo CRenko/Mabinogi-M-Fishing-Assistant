@@ -57,11 +57,15 @@ class EngineEventsMixin:
             self.fishing_success_metric.value_label.setText(
                 f"{event.successful_fishing_count} 次"
             )
+            self.fishing_ordinary_metric.value_label.setText(
+                f"{event.ordinary_fishing_count} 次"
+            )
             self.fishing_failure_metric.value_label.setText(
                 f"{event.failed_fishing_count} 次"
             )
             self.floating_status_bar.set_fishing_session_stats(
                 event.successful_fishing_count,
+                event.ordinary_fishing_count,
                 event.failed_fishing_count,
             )
             return

@@ -64,11 +64,11 @@ class FloatingStatusBar(QWidget):
         states.addWidget(self.runtime_label, 1)
         layout.addLayout(states)
 
-        self.fishing_session_label = QLabel("本次钓鱼 · 正确 0 次  |  失败 0 次")
+        self.fishing_session_label = QLabel("本次钓鱼 · 上鱼 0 | 普通 0 | 失败 0")
         self.fishing_session_label.setObjectName("floatingHint")
         self.fishing_session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.fishing_session_label.setToolTip(
-            "显示本次自动钓鱼的正确次数和失败次数；下次启动时重新统计。"
+            "显示本次自动钓鱼的上鱼成功、普通成功和失败次数。"
         )
         layout.addWidget(self.fishing_session_label)
 
@@ -135,9 +135,11 @@ class FloatingStatusBar(QWidget):
         )
         self.runtime_label.setToolTip(text)
 
-    def set_fishing_session_stats(self, successful: int, failed: int) -> None:
+    def set_fishing_session_stats(
+        self, successful: int, ordinary: int, failed: int
+    ) -> None:
         self.fishing_session_label.setText(
-            f"本次钓鱼 · 正确 {successful} 次  |  失败 {failed} 次"
+            f"本次钓鱼 · 上鱼 {successful} | 普通 {ordinary} | 失败 {failed}"
         )
 
     def set_theme(self, theme: str) -> None:
