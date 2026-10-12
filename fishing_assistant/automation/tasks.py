@@ -184,6 +184,7 @@ class TaskControlMixin:
                 )
         self._fishing_session_active = False
         self._fishing_history_id = None
+        self._emit_fishing_session_stats()
 
     def _emit_fishing_session_stats(self) -> None:
         self._emit(
@@ -202,6 +203,7 @@ class TaskControlMixin:
         self._fish_round_full_recovered = False
         self._fish_round_initial_width = 0
         self._fish_round_collect_pressed = False
+        self._fish_round_last_stamina_at = 0.0
 
     def toggle_monitoring(self) -> None:
         # F8 始终保留启停语义；悬浮栏“继续”不等于重新启动其他任务。

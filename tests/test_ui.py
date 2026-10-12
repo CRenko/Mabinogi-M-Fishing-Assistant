@@ -34,6 +34,12 @@ from fishing_assistant.ui import (
 )
 from fishing_assistant.config import AppConfig
 from fishing_assistant.engine import EngineEvent, EventKind
+from fishing_assistant.automation.models import FishingResult
+from fishing_assistant.features.fishing_history.page import FishingHistoryPage
+from fishing_assistant.features.fishing_history.store import (
+    FishingHistoryStore,
+    FishingHistorySummary,
+)
 from fishing_assistant.updates import UpdateResult
 
 
@@ -67,7 +73,15 @@ class UiRegressionTests(unittest.TestCase):
         titles = [title for _eyebrow, title, _subtitle in MainWindow.PAGE_META]
         self.assertEqual(
             titles,
-            ["钓鱼控制台", "钓鱼设置", "自动制作（测试）", "识别阈值", "应用设置", "使用说明"],
+            [
+                "钓鱼控制台",
+                "钓鱼设置",
+                "自动制作（测试）",
+                "识别阈值",
+                "应用设置",
+                "使用说明",
+                "钓鱼历史",
+            ],
         )
         self.assertNotIn("背包清理（实验性）", titles)
 
@@ -142,7 +156,7 @@ class UiRegressionTests(unittest.TestCase):
             self.assertIn("模式 2 · 定时收鱼（推荐）", labels)
             self.assertIn("模式 3 · 上钩立即收杆", labels)
             self.assertIn("本次钓鱼记录", labels)
-            self.assertIn("未确认的误识别不计入", labels)
+            self.assertIn("证据不足的轮次会提示且不计入", labels)
         finally:
             page.close()
 
@@ -237,6 +251,31 @@ class UiRegressionTests(unittest.TestCase):
         finally:
             bar.close()
 
+    def test_fishing_history_page_displays_saved_records_and_analysis(self) -> None:
+        store = FishingHistoryStore()
+        session_id = store.start_session()
+        store.record_result(session_id, FishingResult.CATCH)
+        store.record_result(session_id, FishingResult.ORDINARY)
+        store.record_result(session_id, FishingResult.FAILURE)
+        store.finish_session(session_id, "stopped")
+        engine = SimpleNamespace(
+            fishing_history_summary=store.summary,
+            fishing_history_sessions=store.list_sessions,
+        )
+        page = FishingHistoryPage(engine)
+        try:
+            self.assertEqual(page.session_metric.value_label.text(), "1")
+            self.assertEqual(page.round_metric.value_label.text(), "3")
+            self.assertEqual(page.success_rate_metric.value_label.text(), "66.7%")
+            self.assertEqual(page.table.rowCount(), 1)
+            self.assertEqual(page.table.item(0, 2).text(), "1")
+            self.assertEqual(page.table.item(0, 3).text(), "1")
+            self.assertEqual(page.table.item(0, 4).text(), "1")
+            self.assertEqual(page.table.item(0, 6).text(), "手动停止")
+        finally:
+            page.close()
+            store.close()
+
     def test_floating_status_only_shows_for_minimized_background_mode(self) -> None:
         config = SimpleNamespace(
             floating_status_enabled=True,
@@ -281,6 +320,8 @@ class UiRegressionTests(unittest.TestCase):
         engine.config.return_value = config
         engine.is_monitoring.return_value = False
         engine.is_crafting.return_value = False
+        engine.fishing_history_summary.return_value = FishingHistorySummary(0, 0, 0, 0, 0)
+        engine.fishing_history_sessions.return_value = []
 
         with patch(
             "fishing_assistant.window_target.list_target_windows",
@@ -305,6 +346,8 @@ class UiRegressionTests(unittest.TestCase):
         engine.config.return_value = AppConfig(voice_alerts_enabled=False)
         engine.is_monitoring.return_value = False
         engine.is_crafting.return_value = False
+        engine.fishing_history_summary.return_value = FishingHistorySummary(0, 0, 0, 0, 0)
+        engine.fishing_history_sessions.return_value = []
 
         with patch(
             "fishing_assistant.window_target.list_target_windows",
@@ -364,6 +407,8 @@ class UiRegressionTests(unittest.TestCase):
 
         engine.update_config.side_effect = update_config
         engine.is_monitoring.return_value = False
+        engine.fishing_history_summary.return_value = FishingHistorySummary(0, 0, 0, 0, 0)
+        engine.fishing_history_sessions.return_value = []
         with patch(
             "fishing_assistant.window_target.list_target_windows",
             return_value=[],

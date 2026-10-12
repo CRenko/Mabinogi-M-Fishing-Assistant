@@ -32,6 +32,7 @@ from fishing_assistant.desktop.pages.settings import SettingsPageMixin
 from fishing_assistant.desktop.pages.thresholds import ThresholdPageMixin
 from fishing_assistant.desktop.styles import DAY_STYLE, NIGHT_STYLE
 from fishing_assistant.engine import EventKind, FishingEngine
+from fishing_assistant.features.fishing_history.page import FishingHistoryPage
 from fishing_assistant.voice_alerts import (
     VoiceAlertPlayer,
     WINDOW_MINIMIZED_CUE,
@@ -64,6 +65,7 @@ class MainWindow(
         ("DETECTION · TUNING", "识别阈值", "调整图标识别方式、区域和兼容模式阈值。"),
         ("APPLICATION · SETTINGS", "应用设置", "管理更新检查与本地诊断日志。"),
         ("GUIDE · HOTKEYS", "使用说明", "查看校准流程和全局快捷键。"),
+        ("FISHING · HISTORY", "钓鱼历史", "查看会话记录与累计统计。"),
     )
 
     engine_event = Signal(object)
@@ -133,6 +135,8 @@ class MainWindow(
         self.stack.addWidget(self._build_threshold_page())
         self.stack.addWidget(self._build_settings_page())
         self.stack.addWidget(self._build_help_page())
+        self.fishing_history_page = FishingHistoryPage(self.engine)
+        self.stack.addWidget(self.fishing_history_page)
         content_layout.addWidget(self.stack, 1)
         root_layout.addWidget(content, 1)
         self.setCentralWidget(root)
@@ -186,6 +190,7 @@ class MainWindow(
         layout.addWidget(application_label)
         layout.addWidget(self._nav_button("设置", 4))
         layout.addWidget(self._nav_button("使用说明", 5))
+        layout.addWidget(self._nav_button("钓鱼历史", 6))
         layout.addSpacing(14)
 
         footer = QLabel(f"v{APP_VERSION}  ·  {APP_AUTHOR}")

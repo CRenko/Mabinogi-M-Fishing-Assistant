@@ -20,6 +20,7 @@ from fishing_assistant.config import AppConfig
 from fishing_assistant.desktop.design import ui_font
 from fishing_assistant.desktop.main_window import MainWindow
 from fishing_assistant.desktop.pages.sectioned import SectionedPage
+from fishing_assistant.features.fishing_history.store import FishingHistorySummary
 from fishing_assistant.window_target import WindowInfo
 from fishing_assistant.engine import EngineEvent, EventKind
 
@@ -39,6 +40,10 @@ class DesktopLayoutTests(unittest.TestCase):
             self.config = self.config.copy(**changes)
             return self.config.copy()
         self.engine.update_config.side_effect = update
+        self.engine.fishing_history_summary.return_value = FishingHistorySummary(
+            0, 0, 0, 0, 0
+        )
+        self.engine.fishing_history_sessions.return_value = []
         for method in ("is_monitoring", "is_crafting", "is_paused"):
             getattr(self.engine, method).return_value = False
         with patch("fishing_assistant.window_target.list_target_windows", return_value=[
@@ -151,10 +156,10 @@ class DesktopLayoutTests(unittest.TestCase):
             if widget.parentWidget() is canvas
         ]
         self.assertEqual(len(cards), 4)
-        self.window.resize(900, 680)
+        self.window.resize(1080, 680)
         self.app.processEvents()
         narrow_widths = [card.width() for card in cards]
-        self.assertEqual(self.window.width(), 900)
+        self.assertEqual(self.window.width(), 1080)
         self.assertEqual(page.horizontalScrollBar().maximum(), 0)
         self.assertTrue(
             all(card.width() >= card.minimumSizeHint().width() for card in cards)
@@ -185,7 +190,7 @@ class DesktopLayoutTests(unittest.TestCase):
 
     def test_sidebar_keeps_application_pages_at_bottom(self):
         buttons = self.window._navigation
-        self.assertEqual([b.text() for b in buttons], ["控制台", "钓鱼设置", "自动制作（测试）", "识别阈值", "设置", "使用说明"])
+        self.assertEqual([b.text() for b in buttons], ["控制台", "钓鱼设置", "自动制作（测试）", "识别阈值", "设置", "使用说明", "钓鱼历史"])
         self.assertGreater(buttons[4].y() - (buttons[3].y() + buttons[3].height()), 50)
 
     def test_capture_input_and_recognition_use_distinct_technical_names(self):

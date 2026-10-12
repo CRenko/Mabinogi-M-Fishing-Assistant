@@ -68,6 +68,8 @@ class EngineEventsMixin:
                 event.ordinary_fishing_count,
                 event.failed_fishing_count,
             )
+            if hasattr(self, "fishing_history_page"):
+                self.fishing_history_page.refresh()
             return
         if event.kind == EventKind.PAUSE:
             if not self.engine.is_monitoring():
