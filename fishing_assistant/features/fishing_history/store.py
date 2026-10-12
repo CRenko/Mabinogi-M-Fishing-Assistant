@@ -47,19 +47,9 @@ class FishingHistoryStore:
 
     def __init__(self, database_path: str | Path | None = None) -> None:
         self.database_path = str(database_path) if database_path is not None else ":memory:"
-        if self.database_path != ":memory:":
-            Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        self._connection = sqlite3.connect(
-            self.database_path, check_same_thread=False, timeout=5.0
-        )
+        self._connection: sqlite3.Connection | None = None
         self._closed = False
-        self._connection.execute("PRAGMA foreign_keys = ON")
-        self._connection.execute("PRAGMA busy_timeout = 5000")
-        if self.database_path != ":memory:":
-            self._connection.execute("PRAGMA journal_mode = WAL")
-        self._create_schema()
-        self._mark_unfinished_sessions_interrupted()
 
     @classmethod
     def default(cls) -> FishingHistoryStore:
@@ -73,8 +63,9 @@ class FishingHistoryStore:
         return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     def _create_schema(self) -> None:
-        with self._connection:
-            self._connection.execute(
+        connection = self._get_connection()
+        with connection:
+            connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS fishing_sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,7 +79,7 @@ class FishingHistoryStore:
                 )
                 """
             )
-            self._connection.execute(
+            connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS fishing_sessions_started_at
                 ON fishing_sessions (started_at DESC)
@@ -96,8 +87,9 @@ class FishingHistoryStore:
             )
 
     def _mark_unfinished_sessions_interrupted(self) -> None:
-        with self._connection:
-            self._connection.execute(
+        connection = self._get_connection()
+        with connection:
+            connection.execute(
                 """
                 UPDATE fishing_sessions
                 SET ended_at = ?, status = 'interrupted',
@@ -108,9 +100,9 @@ class FishingHistoryStore:
             )
 
     def start_session(self) -> int:
-        self._ensure_open()
-        with self._lock, self._connection:
-            cursor = self._connection.execute(
+        connection = self._get_connection()
+        with self._lock, connection:
+            cursor = connection.execute(
                 """
                 INSERT INTO fishing_sessions (started_at, status)
                 VALUES (?, 'running')
@@ -125,9 +117,9 @@ class FishingHistoryStore:
             FishingResult.ORDINARY: "ordinary_count",
             FishingResult.FAILURE: "failure_count",
         }[result]
-        self._ensure_open()
-        with self._lock, self._connection:
-            cursor = self._connection.execute(
+        connection = self._get_connection()
+        with self._lock, connection:
+            cursor = connection.execute(
                 f"""
                 UPDATE fishing_sessions
                 SET {column} = {column} + 1
@@ -141,9 +133,9 @@ class FishingHistoryStore:
                 )
 
     def finish_session(self, session_id: int, end_reason: str) -> None:
-        self._ensure_open()
-        with self._lock, self._connection:
-            self._connection.execute(
+        connection = self._get_connection()
+        with self._lock, connection:
+            connection.execute(
                 """
                 UPDATE fishing_sessions
                 SET ended_at = ?, status = 'completed', end_reason = ?
@@ -153,10 +145,10 @@ class FishingHistoryStore:
             )
 
     def list_sessions(self, limit: int = 100) -> list[FishingHistoryRecord]:
-        self._ensure_open()
+        connection = self._get_connection()
         safe_limit = max(1, min(1000, int(limit)))
         with self._lock:
-            rows = self._connection.execute(
+            rows = connection.execute(
                 """
                 SELECT id, started_at, ended_at, catch_count, ordinary_count,
                        failure_count, status, end_reason
@@ -169,9 +161,9 @@ class FishingHistoryStore:
         return [FishingHistoryRecord(*row) for row in rows]
 
     def summary(self) -> FishingHistorySummary:
-        self._ensure_open()
+        connection = self._get_connection()
         with self._lock:
-            row = self._connection.execute(
+            row = connection.execute(
                 """
                 SELECT COUNT(*), COALESCE(SUM(catch_count), 0),
                        COALESCE(SUM(ordinary_count), 0),
@@ -195,8 +187,32 @@ class FishingHistoryStore:
         with self._lock:
             if self._closed:
                 return
-            self._connection.close()
+            if self._connection is not None:
+                self._connection.close()
             self._closed = True
+
+    def _get_connection(self) -> sqlite3.Connection:
+        with self._lock:
+            self._ensure_open()
+            if self._connection is None:
+                if self.database_path != ":memory:":
+                    Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
+                connection = sqlite3.connect(
+                    self.database_path, check_same_thread=False, timeout=5.0
+                )
+                self._connection = connection
+                try:
+                    connection.execute("PRAGMA foreign_keys = ON")
+                    connection.execute("PRAGMA busy_timeout = 5000")
+                    if self.database_path != ":memory:":
+                        connection.execute("PRAGMA journal_mode = WAL")
+                    self._create_schema()
+                    self._mark_unfinished_sessions_interrupted()
+                except (OSError, sqlite3.Error):
+                    connection.close()
+                    self._connection = None
+                    raise
+            return self._connection
 
     def _ensure_open(self) -> None:
         if self._closed:
